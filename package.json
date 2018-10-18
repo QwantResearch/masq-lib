@@ -34,6 +34,8 @@
     "hyperdb": "^3.5.0",
     "random-access-idb": "^1.0.4",
     "signalhubws": "^1.0.4",
-    "webrtc-swarm": "^2.9.0"
+    "uuid": "^3.3.2",
+    "webrtc-swarm": "^2.9.0",
+    "wrtc": "^0.2.1"
   }
 }
