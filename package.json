@@ -1,0 +1,38 @@
+{
+  "name": "hypermasq-lib",
+  "version": "0.0.0",
+  "description": "",
+  "module": "src/index.js",
+  "scripts": {
+    "test": "eslint src/ test/ && jest",
+    "build": "webpack -p"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/G-Ray/hypermasq-lib.git"
+  },
+  "author": "",
+  "bugs": {
+    "url": "https://github.com/G-Ray/hypermasq-lib/issues"
+  },
+  "homepage": "https://github.com/G-Ray/hypermasq-lib#readme",
+  "devDependencies": {
+    "eslint": "^5.7.0",
+    "eslint-config-standard": "^12.0.0",
+    "eslint-plugin-import": "^2.14.0",
+    "eslint-plugin-jest": "^21.25.1",
+    "eslint-plugin-node": "^7.0.1",
+    "eslint-plugin-promise": "^4.0.1",
+    "eslint-plugin-standard": "^4.0.0",
+    "jest": "^23.6.0",
+    "random-access-memory": "^3.0.0",
+    "webpack": "^4.20.2",
+    "webpack-cli": "^3.1.2"
+  },
+  "dependencies": {
+    "hyperdb": "^3.5.0",
+    "random-access-idb": "^1.0.4",
+    "signalhubws": "^1.0.4",
+    "webrtc-swarm": "^2.9.0"
+  }
+}
