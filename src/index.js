@@ -1,9 +1,8 @@
-// const swarm = require('webrtc-swarm')
-// const signalhub = require('signalhubws')
+const swarm = require('webrtc-swarm')
+const signalhub = require('signalhubws')
 const rai = require('random-access-idb')
 const hyperdb = require('hyperdb')
-
-// const hub = signalhub('swarm-example', ['localhost:8080'])
+const uuidv4 = require('uuid/v4')
 
 class Masq {
   /**
@@ -14,9 +13,16 @@ class Masq {
     this.profile = null
     this.sw = null
     this.app = app
+    this.channel = null
+    this.challenge = null
     this.dbs = {
       profiles: null // masq public profiles
     }
+    this._generateLinkParameters()
+  }
+
+  close () {
+    this.sw = null
   }
 
   async init () {
@@ -29,7 +35,6 @@ class Masq {
   getProfiles () {
     return new Promise((resolve, reject) => {
       const db = this.dbs.profiles
-      console.log('getProfiles')
       db.get('/users', (err, nodes) => {
         if (err) return reject(err)
         if (!nodes.length) return resolve([])
@@ -97,6 +102,31 @@ class Masq {
   _openAndSyncDatabases () {
     const db = hyperdb(rai('masq-profiles'), { valueEncoding: 'json' })
     this.dbs.profiles = db
+  }
+
+  _generateLinkParameters () {
+    this.channel = uuidv4()
+    this.challenge = uuidv4()
+  }
+
+  _getLink () {
+    return `?channel=${this.channel}&challenge=${this.challenge}`
+  }
+
+  requestMasqAccess () {
+    // Subscribe to channel for a limited time to sync with masq
+    const hub = signalhub(this.channel, ['localhost:8080'])
+
+    if (swarm.WEBRTC_SUPPORT) {
+      this.sw = swarm(hub)
+    } else {
+      this.sw = swarm(hub, { wrtc: require('wrtc') })
+    }
+
+    this.sw.on('disconnect', (peer, id) => {
+      this.sw.close()
+      hub.close()
+    })
   }
 }
 
