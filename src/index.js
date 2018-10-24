@@ -12,6 +12,7 @@ class Masq {
   constructor (app) {
     this.profile = null
     this.sw = null
+    this.hub = null
     this.app = app
     this.channel = null
     this.challenge = null
@@ -19,10 +20,6 @@ class Masq {
       profiles: null // masq public profiles
     }
     this._generateLinkParameters()
-  }
-
-  close () {
-    this.sw = null
   }
 
   async init () {
@@ -100,18 +97,40 @@ class Masq {
 
   requestMasqAccess () {
     // Subscribe to channel for a limited time to sync with masq
-    const hub = signalhub(this.channel, ['localhost:8080'])
+    this.hub = signalhub(this.channel, ['localhost:8080'])
 
     if (swarm.WEBRTC_SUPPORT) {
-      this.sw = swarm(hub)
+      this.sw = swarm(this.hub)
     } else {
-      this.sw = swarm(hub, { wrtc: require('wrtc') })
+      this.sw = swarm(this.hub, { wrtc: require('wrtc') })
     }
+
+    this.sw.on('peer', (peer, id) => {
+      // check challenges
+      peer.on('data', data => this._handleData(data))
+    })
+
+    this.sw.on('close', () => {
+      this.hub.close()
+    })
 
     this.sw.on('disconnect', (peer, id) => {
       this.sw.close()
-      hub.close()
+      this.hub.close()
     })
+  }
+
+  _handleData (data) {
+    const json = JSON.parse(data)
+    switch (json.msg) {
+      case 'challenge':
+        if (json.challenge !== this.challenge) {
+          // This peer may be malicious, close the connection
+          this.sw.close()
+          this.hub.close()
+        }
+        break
+    }
   }
 
   /** open and sync existing databases */

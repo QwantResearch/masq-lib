@@ -50,18 +50,54 @@ test('should join a channel', done => {
   const channel = link.substring(offset, offset + uuidSize)
   expect(channel).toHaveLength(uuidSize)
   const hub = signalhub(channel, ['localhost:8080'])
-  let sw = swarm(hub, { wrtc })
-
-  masq.requestMasqAccess()
+  const sw = swarm(hub, { wrtc })
 
   sw.on('peer', (peer, id) => {
     expect(sw.peers).toHaveLength(1)
+    sw.close()
+    hub.close()
+  })
+
+  sw.on('close', () => {
+    done()
+  })
+
+  masq.requestMasqAccess()
+})
+
+test('should be kicked if challenge does not match', async (done) => {
+  expect.assertions(3)
+
+  masq = new Masq()
+  await masq.init()
+
+  const uuidSize = 36
+  const link = masq._getLink()
+  const offset = '?channel='.length
+  const channel = link.substring(offset, offset + uuidSize)
+  expect(channel).toHaveLength(uuidSize)
+  const hub = signalhub(channel, ['localhost:8080'])
+  const sw = swarm(hub, { wrtc })
+
+  sw.on('peer', (peer, id) => {
+    expect(sw.peers).toHaveLength(1)
+
+    peer.send(JSON.stringify({
+      msg: 'challenge',
+      challenge: 'challengemismatch'
+    }))
+  })
+
+  sw.on('disconnect', (peer, id) => {
+    expect(peer).toBeDefined()
     sw.close()
   })
 
   sw.on('close', () => {
     done()
   })
+
+  masq.requestMasqAccess()
 })
 
 test('put should reject when there is no profile selected', async () => {
