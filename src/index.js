@@ -98,21 +98,6 @@ class Masq {
     })
   }
 
-  /** open and sync existing databases */
-  _openAndSyncDatabases () {
-    const db = hyperdb(rai('masq-profiles'), { valueEncoding: 'json' })
-    this.dbs.profiles = db
-  }
-
-  _generateLinkParameters () {
-    this.channel = uuidv4()
-    this.challenge = uuidv4()
-  }
-
-  _getLink () {
-    return `?channel=${this.channel}&challenge=${this.challenge}`
-  }
-
   requestMasqAccess () {
     // Subscribe to channel for a limited time to sync with masq
     const hub = signalhub(this.channel, ['localhost:8080'])
@@ -127,6 +112,21 @@ class Masq {
       this.sw.close()
       hub.close()
     })
+  }
+
+  /** open and sync existing databases */
+  _openAndSyncDatabases () {
+    const db = hyperdb(rai('masq-profiles'), { valueEncoding: 'json' })
+    this.dbs.profiles = db
+  }
+
+  _generateLinkParameters () {
+    this.channel = uuidv4()
+    this.challenge = uuidv4()
+  }
+
+  _getLink () {
+    return `?channel=${this.channel}&challenge=${this.challenge}`
   }
 }
 

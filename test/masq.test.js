@@ -63,3 +63,30 @@ test('should join a channel', done => {
     done()
   })
 })
+
+test('put should reject when there is no profile selected', async () => {
+  expect.assertions(1)
+  try {
+    await masq.put('key', 'value')
+  } catch (e) {
+    expect(e.message).toBe('No profile selected')
+  }
+})
+
+test('get should reject when there is no profile selected', async () => {
+  expect.assertions(1)
+  try {
+    await masq.get('key')
+  } catch (e) {
+    expect(e.message).toBe('No profile selected')
+  }
+})
+
+test('del should reject when there is no profile selected', async () => {
+  expect.assertions(1)
+  try {
+    await masq.del('key')
+  } catch (e) {
+    expect(e.message).toBe('No profile selected')
+  }
+})
