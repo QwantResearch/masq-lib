@@ -1,14 +1,18 @@
 # Masq lib
+
 Developers will use masq-lib to
+
 - manage users (signin, signout)
 - sync and securely store data
 
 ## Databases architecture
+
 - masq-core: In this DB, masq will store users' preferences for instance. It should stay private between masq app instances, hence, it is never exposed to web apps.
 - masq-profiles: Contains users public info (id, username, avatar)
 - all apps databases. One DB per user, per app.
 
 ### masq-core
+
 - `/users` -> list of users ids
 - `/users/:id/profile` -> private profile (username, avatar, lastname, firstname)
 - `/users/:id/apps` -> list of apps ids
@@ -17,13 +21,16 @@ Developers will use masq-lib to
 - [...]
 
 ### masq-profiles
+
 - `/users` -> list of users ids
 - `/users/:id/profile` -> public profile (username, avatar)
 
 ### App db
+
 The app DB will be used freely by the app developer. We encapsulate the `put/get/del` methods exposed by hyperdb, as Promises. So the developer should refer to the hyperdb's doc for an in-depth explanation: https://github.com/mafintosh/hyperdb/blob/master/ARCHITECTURE.md.
 
-## How it works:
+## How it works
+
 1) User need to register a new profile inside Masq. (at masq.qwant.com for instance). Masq will create and sync multiple DBs.
 
 2) The user go to a compatible app. As it is the first time he opens this app, the app will provide a unique and secure link to sync `masq-profiles` db ((read-only). Once the user clicks on the link, the app will exchange messages through webrtc with masq to sync the db.
