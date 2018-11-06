@@ -74,71 +74,32 @@ class Masq extends EventEmitter {
   }
 
   /**
- * Return the value of a given key
- * @param {Object} db - The hyperdb instance
- * @param {string} key - The key
- * @returns {string|Object} - The value
- */
-  get (db, key) {
+   * Get a value
+   * @param {string} key - Key
+   */
+  get (key) {
     return new Promise((resolve, reject) => {
-      db.get(key, function (err, data) {
-        if (err) reject(err)
-        if (!data[0]) {
-          resolve(null)
-        } else {
-          resolve(data[0].value)
-        }
+      if (!this.profile) return reject(Error('No profile selected'))
+      const db = this.dbs[this.profile]
+      db.get(key, (err, nodes) => {
+        if (err) return reject(err)
+        resolve(nodes)
       })
     })
   }
 
   /**
- * Return the value of a given key in data db
- * @param {string} key - The key
- * @returns {string|Object} - The value
- */
-  getItem (key) {
-    const db = this.dbs.data
+   * Put a new value in the current profile database
+   * @param {string} key - Key
+   * @param {string} value - The value to insert
+   */
+  put (key, value) {
     return new Promise((resolve, reject) => {
-      db.get(key, function (err, data) {
-        if (err) reject(err)
-        if (!data[0]) {
-          resolve(null)
-        } else {
-          resolve(data[0].value)
-        }
-      })
-    })
-  }
-
-  /**
- * Set a key to the hyperdb
- * @param {Object} db - The hyperdb instance
- * @param {string} key - The key
- * @param {Object|string} value - The content
- * @returns {int} -The sequence number
- */
-  set (db, key, value) {
-    return new Promise((resolve, reject) => {
+      if (!this.profile) return reject(Error('No profile selected'))
+      const db = this.dbs[this.profile]
       db.put(key, value, err => {
-        if (err) reject(err)
-        resolve(value)
-      })
-    })
-  }
-
-  /**
- * Set a key to the data hyperdb
- * @param {string} key - The key
- * @param {Object|string} value - The content
- * @returns {int} -The sequence number
- */
-  setItem (key, value) {
-    const db = this.dbs.data
-    return new Promise((resolve, reject) => {
-      db.put(key, value, err => {
-        if (err) reject(err)
-        resolve(value)
+        if (err) return reject(err)
+        resolve()
       })
     })
   }
@@ -218,6 +179,7 @@ class Masq extends EventEmitter {
 
   exchangeDataHyperdbKeys (appName) {
     // Subscribe to channel for a limited time to sync with masq
+    if (!this.profile) throw (new Error('No profile selected'))
     const hub = signalhub(this.channel, [HUB_URL])
     let sw = null
 
@@ -257,7 +219,7 @@ class Masq extends EventEmitter {
             const db = hyperdb(rai(appName), Buffer.from(json.key, 'hex'), { valueEncoding: 'json' })
             await dbReady(db)
             // Store
-            this.dbs.data = db
+            this.dbs[this.profile] = db
 
             peer.send(JSON.stringify({
               msg: 'requestWriteAccess',
@@ -266,7 +228,7 @@ class Masq extends EventEmitter {
           }
           break
         case 'ready':
-          this._startDataReplication(this.dbs.data, appName)
+          this._startDataReplication(this.dbs[this.profile], appName)
           sw.close()
           break
         default:

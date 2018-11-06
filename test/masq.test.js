@@ -48,6 +48,33 @@ test('initialize', async () => {
   expect(profile).toEqual(profile1)
 })
 
+test('put should reject when there is no profile selected', async () => {
+  expect.assertions(1)
+  try {
+    await masq.put('key', 'value')
+  } catch (e) {
+    expect(e.message).toBe('No profile selected')
+  }
+})
+
+test('get should reject when there is no profile selected', async () => {
+  expect.assertions(1)
+  try {
+    await masq.get('key')
+  } catch (e) {
+    expect(e.message).toBe('No profile selected')
+  }
+})
+
+test('del should reject when there is no profile selected', async () => {
+  expect.assertions(1)
+  try {
+    await masq.del('key')
+  } catch (e) {
+    expect(e.message).toBe('No profile selected')
+  }
+})
+
 // test('should get empty profiles', async () => {
 //   let profiles = await masq.getProfiles()
 //   expect(profiles).toEqual([])
@@ -87,40 +114,40 @@ test('should join a channel', done => {
   masq.requestMasqAccess()
 })
 
-// test('should be kicked if challenge does not match', async (done) => {
-//   expect.assertions(3)
+test('should be kicked if challenge does not match', async (done) => {
+  expect.assertions(3)
 
-//   masq = new Masq()
-//   await masq.init()
+  masq = new Masq()
+  await masq.init()
 
-//   const uuidSize = 36
-//   const link = masq._getLink()
-//   const offset = '?channel='.length
-//   const channel = link.substring(offset, offset + uuidSize)
-//   expect(channel).toHaveLength(uuidSize)
-//   const hub = signalhub(channel, ['localhost:8080'])
-//   const sw = swarm(hub, { wrtc })
+  const uuidSize = 36
+  const link = masq._getLink()
+  const offset = '?channel='.length
+  const channel = link.substring(offset, offset + uuidSize)
+  expect(channel).toHaveLength(uuidSize)
+  const hub = signalhub(channel, ['localhost:8080'])
+  const sw = swarm(hub, { wrtc })
 
-//   sw.on('peer', (peer, id) => {
-//     expect(sw.peers).toHaveLength(1)
+  sw.on('peer', (peer, id) => {
+    expect(sw.peers).toHaveLength(1)
 
-//     peer.send(JSON.stringify({
-//       msg: 'sendProfilesKey',
-//       challenge: 'challengemismatch'
-//     }))
-//   })
+    peer.send(JSON.stringify({
+      msg: 'sendProfilesKey',
+      challenge: 'challengemismatch'
+    }))
+  })
 
-//   sw.on('disconnect', (peer, id) => {
-//     expect(peer).toBeDefined()
-//     sw.close()
-//   })
+  sw.on('disconnect', (peer, id) => {
+    expect(peer).toBeDefined()
+    sw.close()
+  })
 
-//   sw.on('close', () => {
-//     done()
-//   })
+  sw.on('close', () => {
+    done()
+  })
 
-//   masq.requestMasqAccess()
-// })
+  masq.requestMasqAccess()
+})
 
 test('should replicate masq-profiles', async (done) => {
   expect.assertions(4)
@@ -152,10 +179,21 @@ test('should replicate masq-profiles', async (done) => {
   masq.requestMasqAccess()
 })
 
+test('should fail when there is no profile selected', async () => {
+  expect.assertions(1)
+  try {
+    masq.exchangeDataHyperdbKeys('app')
+  } catch (e) {
+    expect(e.message).toBe('No profile selected')
+  }
+})
+
 test('should exchange key and authorize local key if challenge matches', async (done) => {
   expect.assertions(1)
-  masq = new Masq()
-  await masq.init()
+  const profiles = await masq.getProfiles()
+  console.log(profiles)
+  // We check which profile corresponds to the current user
+  masq.setProfile(profiles[0].id)
 
   const challenge = masq.challenge
   const channel = masq.channel
@@ -183,32 +221,5 @@ test('should exchange key and authorize local key if challenge matches', async (
   masq.exchangeDataHyperdbKeys(appName)
   await wait()
   // add item to webapp
-  await masq.setItem('/hello', { data: 'world' })
+  await masq.put('/hello', { data: 'world' })
 })
-
-// test('put should reject when there is no profile selected', async () => {
-//   expect.assertions(1)
-//   try {
-//     await masq.put('key', 'value')
-//   } catch (e) {
-//     expect(e.message).toBe('No profile selected')
-//   }
-// })
-
-// test('get should reject when there is no profile selected', async () => {
-//   expect.assertions(1)
-//   try {
-//     await masq.get('key')
-//   } catch (e) {
-//     expect(e.message).toBe('No profile selected')
-//   }
-// })
-
-// test('del should reject when there is no profile selected', async () => {
-//   expect.assertions(1)
-//   try {
-//     await masq.del('key')
-//   } catch (e) {
-//     expect(e.message).toBe('No profile selected')
-//   }
-// })
