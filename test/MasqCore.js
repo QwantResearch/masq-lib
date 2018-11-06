@@ -322,10 +322,12 @@ class MasqCore extends EventEmitter {
     })
 
     sw.on('close', () => {
+      debug(' startDataReplication : close on masqCore')
       hub.close()
     })
 
     sw.on('disconnect', (peer, id) => {
+      debug(' startDataReplication : disconnect on masqCore')
       sw.close()
       hub.close()
     })

@@ -229,14 +229,16 @@ class Masq extends EventEmitter {
 
     sw.on('peer', (peer, id) => {
       // check challenges
-      peer.on('data', data => _handleData(data, peer, appName))
+      peer.on('data', data => _handleData(data, peer, appName, sw))
     })
 
     sw.on('close', () => {
+      debug(' exchangeDataHyperdbKeys : close on masq-lib')
       hub.close()
     })
 
     sw.on('disconnect', (peer, id) => {
+      debug(' exchangeDataHyperdbKeys : disconnect on masq-lib')
       sw.close()
       hub.close()
     })
@@ -265,6 +267,7 @@ class Masq extends EventEmitter {
           break
         case 'ready':
           this._startDataReplication(this.dbs.data, appName)
+          sw.close()
           break
         default:
           console.log('The message type is false.')
@@ -324,10 +327,12 @@ class Masq extends EventEmitter {
     })
 
     sw.on('close', () => {
+      debug(' _startDataReplication : close on masq-lib')
       hub.close()
     })
 
     sw.on('disconnect', (peer, id) => {
+      debug(' _startDataReplication : disconnect on masq-lib')
       sw.close()
       hub.close()
     })

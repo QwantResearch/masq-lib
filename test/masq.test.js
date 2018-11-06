@@ -152,6 +152,40 @@ test('should replicate masq-profiles', async (done) => {
   masq.requestMasqAccess()
 })
 
+test('should exchange key and authorize local key if challenge matches', async (done) => {
+  expect.assertions(1)
+  masq = new Masq()
+  await masq.init()
+
+  const challenge = masq.challenge
+  const channel = masq.channel
+  const appName = 'app1'
+  // this data is normally send by another channel
+  masqCore.receiveLink({
+    type: 'syncData',
+    channel: channel,
+    challenge: challenge,
+    appName: appName
+  })
+
+  masqCore.on('changeDataHello', async msg => {
+    await wait()
+    // check if item is replicated in masq
+    const res = await masqCore.getItem(appName, '/hello')
+    expect(res).toEqual({ data: 'world' })
+    const sw = masqCore.getDataSw(appName)
+    const hub = masqCore.getDataHub(appName)
+    sw.close()
+    hub.close()
+    done()
+  })
+
+  masq.exchangeDataHyperdbKeys(appName)
+  await wait()
+  // add item to webapp
+  await masq.setItem('/hello', { data: 'world' })
+})
+
 // test('put should reject when there is no profile selected', async () => {
 //   expect.assertions(1)
 //   try {
