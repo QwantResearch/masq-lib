@@ -3,16 +3,40 @@ const signalhub = require('signalhubws')
 const rai = require('random-access-idb')
 const hyperdb = require('hyperdb')
 const uuidv4 = require('uuid/v4')
+const wrtc = require('wrtc')
+const pump = require('pump')
+const EventEmitter = require('events')
 
-class Masq {
+const HUB_URL = 'localhost:8080'
+const DEBUG = false
+const debug = (str) => {
+  if (DEBUG) console.log(str)
+}
+
+/**
+ * Return when hyperDb instance is ready
+ * @param {Object} db - The hyperDb instance
+ */
+const dbReady = (db) => {
+  return new Promise((resolve, reject) => {
+    db.on('ready', () => {
+      resolve()
+    })
+  })
+}
+
+class Masq extends EventEmitter {
   /**
    * constructor
    * @param {string} app - The application name
    */
   constructor (app) {
+    super()
     this.profile = null
-    this.sw = null
-    this.hub = null
+    this.sws = {}
+    this.swProfilesReplication = null
+    this.hubs = {}
+    this.hubProfilesReplication = null
     this.app = app
     this.channel = null
     this.challenge = null
@@ -50,32 +74,71 @@ class Masq {
   }
 
   /**
-   * Put a new value in the current profile database
-   * @param {string} key - Key
-   * @param {string} value - The value to insert
-   */
-  put (key, value) {
+ * Return the value of a given key
+ * @param {Object} db - The hyperdb instance
+ * @param {string} key - The key
+ * @returns {string|Object} - The value
+ */
+  get (db, key) {
     return new Promise((resolve, reject) => {
-      if (!this.profile) return reject(Error('No profile selected'))
-      const db = this.dbs[this.profile]
-      db.put(key, value, err => {
-        if (err) return reject(err)
-        resolve()
+      db.get(key, function (err, data) {
+        if (err) reject(err)
+        if (!data[0]) {
+          resolve(null)
+        } else {
+          resolve(data[0].value)
+        }
       })
     })
   }
 
   /**
-   * Get a value
-   * @param {string} key - Key
-   */
-  get (key) {
+ * Return the value of a given key in data db
+ * @param {string} key - The key
+ * @returns {string|Object} - The value
+ */
+  getItem (key) {
+    const db = this.dbs.data
     return new Promise((resolve, reject) => {
-      if (!this.profile) return reject(Error('No profile selected'))
-      const db = this.dbs[this.profile]
-      db.get(key, (err, nodes) => {
-        if (err) return reject(err)
-        resolve(nodes)
+      db.get(key, function (err, data) {
+        if (err) reject(err)
+        if (!data[0]) {
+          resolve(null)
+        } else {
+          resolve(data[0].value)
+        }
+      })
+    })
+  }
+
+  /**
+ * Set a key to the hyperdb
+ * @param {Object} db - The hyperdb instance
+ * @param {string} key - The key
+ * @param {Object|string} value - The content
+ * @returns {int} -The sequence number
+ */
+  set (db, key, value) {
+    return new Promise((resolve, reject) => {
+      db.put(key, value, err => {
+        if (err) reject(err)
+        resolve(value)
+      })
+    })
+  }
+
+  /**
+ * Set a key to the data hyperdb
+ * @param {string} key - The key
+ * @param {Object|string} value - The content
+ * @returns {int} -The sequence number
+ */
+  setItem (key, value) {
+    const db = this.dbs.data
+    return new Promise((resolve, reject) => {
+      db.put(key, value, err => {
+        if (err) reject(err)
+        resolve(value)
       })
     })
   }
@@ -97,46 +160,187 @@ class Masq {
 
   requestMasqAccess () {
     // Subscribe to channel for a limited time to sync with masq
-    this.hub = signalhub(this.channel, ['localhost:8080'])
+    const hub = signalhub(this.channel, [HUB_URL])
+    let sw = null
 
     if (swarm.WEBRTC_SUPPORT) {
-      this.sw = swarm(this.hub)
+      sw = swarm(hub)
     } else {
-      this.sw = swarm(this.hub, { wrtc: require('wrtc') })
+      sw = swarm(hub, { wrtc: require('wrtc') })
     }
 
-    this.sw.on('peer', (peer, id) => {
+    sw.on('peer', (peer, id) => {
       // check challenges
-      peer.on('data', data => this._handleData(data))
+      peer.on('data', data => _handleData(data, peer))
     })
 
-    this.sw.on('close', () => {
-      this.hub.close()
+    sw.on('close', () => {
+      debug(' requestMasqAccess : close on masq-lib')
+      hub.close()
     })
 
-    this.sw.on('disconnect', (peer, id) => {
-      this.sw.close()
-      this.hub.close()
+    sw.on('disconnect', (peer, id) => {
+      debug(' requestMasqAccess : disconnect on masq-lib')
+      sw.close()
+      hub.close()
+    })
+
+    const _handleData = async (data, peer) => {
+      const json = JSON.parse(data)
+
+      switch (json.msg) {
+        case 'sendProfilesKey':
+          if (json.challenge !== this.challenge) {
+            // This peer may be malicious, close the connection
+            sw.close()
+            hub.close()
+          } else {
+            // db creation and replication
+            const db = hyperdb(rai('masq-profiles'), Buffer.from(json.key, 'hex'), { valueEncoding: 'json' })
+            await dbReady(db)
+
+            // Store
+            this.dbs.profiles = db
+
+            this._startReplication(db)
+
+            peer.send(JSON.stringify({
+              msg: 'replicationProfilesStarted'
+            }))
+          }
+          break
+        default:
+          console.log('The message type is false.')
+          break
+      }
+    }
+  }
+
+  exchangeDataHyperdbKeys (appName) {
+    // Subscribe to channel for a limited time to sync with masq
+    const hub = signalhub(this.channel, [HUB_URL])
+    let sw = null
+
+    if (swarm.WEBRTC_SUPPORT) {
+      sw = swarm(hub)
+    } else {
+      sw = swarm(hub, { wrtc: require('wrtc') })
+    }
+
+    sw.on('peer', (peer, id) => {
+      // check challenges
+      peer.on('data', data => _handleData(data, peer, appName))
+    })
+
+    sw.on('close', () => {
+      hub.close()
+    })
+
+    sw.on('disconnect', (peer, id) => {
+      sw.close()
+      hub.close()
+    })
+
+    const _handleData = async (data, peer) => {
+      const json = JSON.parse(data)
+
+      switch (json.msg) {
+        case 'sendDataKey':
+          if (json.challenge !== this.challenge) {
+            // This peer may be malicious, close the connection
+            sw.close()
+            hub.close()
+          } else {
+            // db creation and replication
+            const db = hyperdb(rai(appName), Buffer.from(json.key, 'hex'), { valueEncoding: 'json' })
+            await dbReady(db)
+            // Store
+            this.dbs.data = db
+
+            peer.send(JSON.stringify({
+              msg: 'requestWriteAccess',
+              key: db.local.key.toString('hex')
+            }))
+          }
+          break
+        case 'ready':
+          this._startDataReplication(this.dbs.data, appName)
+          break
+        default:
+          console.log('The message type is false.')
+          break
+      }
+    }
+  }
+
+  async _startReplication (db) {
+    const discoveryKey = db.discoveryKey.toString('hex')
+    this.hubs['syncProfiles'] = signalhub(discoveryKey, [HUB_URL])
+    const hub = this.hubs['syncProfiles']
+    this.sws['syncProfiles'] = swarm(hub, { wrtc })
+    const sw = this.sws['syncProfiles']
+
+    sw.on('peer', async (peer, id) => {
+      const stream = db.replicate({ live: true })
+      pump(peer, stream, peer)
+
+      this.peerProfilesReplication = peer
+      peer.on('data', data => {
+        // do something
+      })
+    })
+
+    db.watch('/users', async () => {
+      this.emit('change', { db: 'masq-profiles', key: '/users' })
+    })
+
+    sw.on('close', () => {
+      debug(' _startReplication : close on masq-lib')
+      hub.close()
+    })
+
+    sw.on('disconnect', (peer, id) => {
+      debug(' _startReplication : disconnect on masq-lib')
+      sw.close()
+      hub.close()
     })
   }
 
-  _handleData (data) {
-    const json = JSON.parse(data)
-    switch (json.msg) {
-      case 'challenge':
-        if (json.challenge !== this.challenge) {
-          // This peer may be malicious, close the connection
-          this.sw.close()
-          this.hub.close()
-        }
-        break
-    }
+  async _startDataReplication (db, name) {
+    const discoveryKey = db.discoveryKey.toString('hex')
+    this.hubs[name] = signalhub(discoveryKey, [HUB_URL])
+    const hub = this.hubs[name]
+    this.sws[name] = swarm(hub, { wrtc })
+    const sw = this.sws[name]
+
+    sw.on('peer', async (peer, id) => {
+      const stream = db.replicate({ live: true })
+      pump(peer, stream, peer)
+
+      this.peer = peer
+      peer.on('data', data => {
+        // do something
+      })
+    })
+
+    sw.on('close', () => {
+      hub.close()
+    })
+
+    sw.on('disconnect', (peer, id) => {
+      sw.close()
+      hub.close()
+    })
+  }
+
+  /** open and sync existing databases */
+  _openAndSyncDatabase () {
   }
 
   /** open and sync existing databases */
   _openAndSyncDatabases () {
-    const db = hyperdb(rai('masq-profiles'), { valueEncoding: 'json' })
-    this.dbs.profiles = db
+    // const db = hyperdb(rai('masq-profiles'), { valueEncoding: 'json' })
+    // this.dbs.profiles = db
   }
 
   _generateLinkParameters () {
