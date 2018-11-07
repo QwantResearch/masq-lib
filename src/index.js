@@ -20,13 +20,12 @@ const dbReady = (db) => {
   })
 }
 
-class Masq extends EventEmitter {
+class Masq {
   /**
    * constructor
    * @param {string} app - The application name
    */
   constructor (app) {
-    super()
     this.profile = null
     this.sws = {}
     this.hubs = {}
@@ -253,11 +252,6 @@ class Masq extends EventEmitter {
     sw.on('peer', async (peer, id) => {
       const stream = db.replicate({ live: true })
       pump(peer, stream, peer)
-    })
-
-    db.watch('/users', async () => {
-      // Emit when the synchonisation is finished.
-      this.emit('change', { db: 'masq-profiles', key: '/users' })
     })
 
     sw.on('close', () => {
