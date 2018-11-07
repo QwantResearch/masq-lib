@@ -149,7 +149,6 @@ class Masq {
           if (json.challenge !== this.challenge) {
             // This peer may be malicious, close the connection
             sw.close()
-            hub.close()
           } else {
             // db creation
             const db = hyperdb(rai('masq-profiles'), Buffer.from(json.key, 'hex'), { valueEncoding: 'json' })
@@ -162,7 +161,8 @@ class Masq {
               msg: 'replicationProfilesStarted'
             }))
             // db replication
-            this._startReplication(db)
+            this._startReplication(this.dbs.profiles, 'profiles')
+            sw.close()
           }
           break
         default:
@@ -200,7 +200,6 @@ class Masq {
 
     sw.on('disconnect', (peer, id) => {
       sw.close()
-      hub.close()
     })
 
     const _handleData = async (data, peer) => {
@@ -211,7 +210,6 @@ class Masq {
           if (json.challenge !== this.challenge) {
             // This peer may be malicious, close the connection
             sw.close()
-            hub.close()
           } else {
             // db creation and replication
             const db = hyperdb(rai(this.profile), Buffer.from(json.key, 'hex'), { valueEncoding: 'json' })
@@ -227,7 +225,7 @@ class Masq {
           break
         case 'ready':
           // Masq must send ready after the authorization
-          this._startDataReplication()
+          this._startReplication(this.dbs[this.profile], this.profile)
           sw.close()
           break
         default:
@@ -236,36 +234,7 @@ class Masq {
     }
   }
 
-  async _startReplication (db) {
-    const discoveryKey = db.discoveryKey.toString('hex')
-    this.hubs['syncProfiles'] = signalhub(discoveryKey, [HUB_URL])
-    const hub = this.hubs['syncProfiles']
-
-    if (swarm.WEBRTC_SUPPORT) {
-      this.sws['syncProfiles'] = swarm(hub)
-    } else {
-      this.sws['syncProfiles'] = swarm(hub, { wrtc: require('wrtc') })
-    }
-    const sw = this.sws['syncProfiles']
-
-    sw.on('peer', async (peer, id) => {
-      const stream = db.replicate({ live: true })
-      pump(peer, stream, peer)
-    })
-
-    sw.on('close', () => {
-      hub.close()
-    })
-
-    sw.on('disconnect', (peer, id) => {
-      sw.close()
-      hub.close()
-    })
-  }
-
-  async _startDataReplication () {
-    const db = this.dbs[this.profile]
-    const name = this.profile
+  async _startReplication (db, name) {
     const discoveryKey = db.discoveryKey.toString('hex')
     this.hubs[name] = signalhub(discoveryKey, [HUB_URL])
     const hub = this.hubs[name]
