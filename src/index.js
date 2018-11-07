@@ -4,7 +4,6 @@ const rai = require('random-access-idb')
 const hyperdb = require('hyperdb')
 const uuidv4 = require('uuid/v4')
 const pump = require('pump')
-const EventEmitter = require('events')
 
 const HUB_URL = 'localhost:8080'
 
