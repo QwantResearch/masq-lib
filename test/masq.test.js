@@ -1,78 +1,36 @@
-const MasqCore = require('./MasqCore')
-// const rai = require('random-access-idb')
-// const hyperdb = require('hyperdb')
 const signalserver = require('signalhubws/server')
 const signalhub = require('signalhubws')
 const swarm = require('webrtc-swarm')
 const wrtc = require('wrtc')
+const rai = require('random-access-idb')
+const hyperdb = require('hyperdb')
 
 const Masq = require('../src')
+
+const HUB_URL = 'localhost:8080'
 
 // user an in memory random-access-storage instead
 jest.mock('random-access-idb', () =>
   () => require('random-access-memory'))
 
-const wait = () => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      resolve()
-    }, 800)
-  })
-}
-
 let server = null
 let masq = null
-let masqCore = null
-let profile1 = {
-  username: 'bob',
-  image: 'image1'
+let dbTest = null
+let profile = {
+  id: '123-4566-8789'
 }
-beforeAll(() => {
+beforeAll(async () => {
   server = signalserver()
   server.listen(8080, () => console.log('server running'))
 })
 
 afterAll(async () => {
-  await wait()
   server.close()
 })
 
 test('initialize', async () => {
   masq = new Masq()
   await masq.init()
-  masqCore = new MasqCore()
-  await masqCore.init()
-  await masqCore.initProfiles()
-  await masqCore.setProfile('bob', profile1)
-  const profile = await masqCore.getProfile('bob')
-  expect(profile).toEqual(profile1)
-})
-
-test('put should reject when there is no profile selected', async () => {
-  expect.assertions(1)
-  try {
-    await masq.put('key', 'value')
-  } catch (e) {
-    expect(e.message).toBe('No profile selected')
-  }
-})
-
-test('get should reject when there is no profile selected', async () => {
-  expect.assertions(1)
-  try {
-    await masq.get('key')
-  } catch (e) {
-    expect(e.message).toBe('No profile selected')
-  }
-})
-
-test('del should reject when there is no profile selected', async () => {
-  expect.assertions(1)
-  try {
-    await masq.del('key')
-  } catch (e) {
-    expect(e.message).toBe('No profile selected')
-  }
 })
 
 // test('should get empty profiles', async () => {
@@ -130,7 +88,6 @@ test('should be kicked if challenge does not match', async (done) => {
 
   sw.on('peer', (peer, id) => {
     expect(sw.peers).toHaveLength(1)
-
     peer.send(JSON.stringify({
       msg: 'sendProfilesKey',
       challenge: 'challengemismatch'
@@ -150,27 +107,44 @@ test('should be kicked if challenge does not match', async (done) => {
 })
 
 test('should replicate masq-profiles', async (done) => {
-  expect.assertions(4)
+  expect.assertions(1)
   masq = new Masq()
   await masq.init()
 
   const challenge = masq.challenge
   const channel = masq.channel
-  // this data is normally send by another channel
-  masqCore.receiveLink({
-    type: 'syncProfiles',
-    channel: channel,
-    challenge: challenge
+
+  /***
+   * A link must be created (and sent to masq) containing :
+   *  type: 'syncProfiles',
+   *  channel: channel,
+   *  challenge: challenge
+   */
+  const hub = signalhub(channel, [HUB_URL])
+  const sw = swarm(hub, { wrtc })
+  const key = 'c4b60362325d27ad3c04db158fa68fe6fde00387467708ab3a0be79c811b3825'
+
+  sw.on('peer', (peer, id) => {
+    peer.on('data', data => {
+      const json = JSON.parse(data)
+
+      expect(json.msg).toBe('replicationProfilesStarted')
+      sw.close()
+      hub.close()
+    })
+
+    peer.send(JSON.stringify({
+      msg: 'sendProfilesKey',
+      challenge: challenge,
+      key: key
+    }))
   })
 
-  masq.on('change', async msg => {
-    expect(msg.db).toBe('masq-profiles')
-    const profiles = await masq.getProfiles()
-    expect(profiles).toHaveLength(1)
-    expect(profiles[0].username).toBe('bob')
-    expect(profiles[0].id).toBeDefined()
-    const sw = masqCore.getSyncProfilesSw()
-    const hub = masqCore.getSyncProfilesHub()
+  sw.on('close', () => {
+    hub.close()
+  })
+
+  sw.on('disconnect', (peer, id) => {
     sw.close()
     hub.close()
     done()
@@ -179,7 +153,7 @@ test('should replicate masq-profiles', async (done) => {
   masq.requestMasqAccess()
 })
 
-test('should fail when there is no profile selected', async () => {
+test('should fail to start key exchange when there is no profile selected', async () => {
   expect.assertions(1)
   try {
     masq.exchangeDataHyperdbKeys('app')
@@ -190,36 +164,111 @@ test('should fail when there is no profile selected', async () => {
 
 test('should exchange key and authorize local key if challenge matches', async (done) => {
   expect.assertions(1)
-  const profiles = await masq.getProfiles()
-  console.log(profiles)
+  masq = new Masq()
+  await masq.init()
   // We check which profile corresponds to the current user
-  masq.setProfile(profiles[0].id)
+  masq.setProfile(profile.id)
 
   const challenge = masq.challenge
   const channel = masq.channel
   const appName = 'app1'
-  // this data is normally send by another channel
-  masqCore.receiveLink({
-    type: 'syncData',
-    channel: channel,
-    challenge: challenge,
-    appName: appName
+  /***
+   * A link must be created (and sent to masq) containing :
+   *  type: 'syncData',
+   *  channel: channel,
+   *  challenge: challenge,
+   *  appName: appName
+   */
+
+  const hub = signalhub(channel, [HUB_URL])
+  const sw = swarm(hub, { wrtc })
+
+  sw.on('peer', (peer, id) => {
+    // create hyperdb for the requested service and send the key
+    const key = 'c4b60362325d27ad3c04db158fa68fe6fde00387467708ab3a0be79c811b3825'
+
+    peer.on('data', data => _handleData(data, peer))
+
+    peer.send(JSON.stringify({
+      msg: 'sendDataKey',
+      challenge: challenge,
+      key: key
+    }))
   })
 
-  masqCore.on('changeDataHello', async msg => {
-    await wait()
-    // check if item is replicated in masq
-    const res = await masqCore.getItem(appName, '/hello')
-    expect(res).toEqual({ data: 'world' })
-    const sw = masqCore.getDataSw(appName)
-    const hub = masqCore.getDataHub(appName)
-    sw.close()
+  sw.on('close', () => {
     hub.close()
     done()
   })
 
+  sw.on('disconnect', (peer, id) => {
+    sw.close()
+    hub.close()
+  })
+
+  const _handleData = async (data, peer) => {
+    const json = JSON.parse(data)
+    switch (json.msg) {
+      case 'requestWriteAccess':
+        expect(json.key).toHaveLength(64)
+        // authorize local key & start replication
+        sw.close()
+        hub.close()
+        break
+      default:
+        break
+    }
+  }
+
   masq.exchangeDataHyperdbKeys(appName)
-  await wait()
-  // add item to webapp
-  await masq.put('/hello', { data: 'world' })
+})
+
+test('put should reject when there is no profile selected', async () => {
+  expect.assertions(1)
+  masq = new Masq()
+  await masq.init()
+  try {
+    await masq.put('key', 'value')
+  } catch (e) {
+    expect(e.message).toBe('No profile selected')
+  }
+})
+
+test('get should reject when there is no profile selected', async () => {
+  expect.assertions(1)
+  try {
+    await masq.get('key')
+  } catch (e) {
+    expect(e.message).toBe('No profile selected')
+  }
+})
+
+test('del should reject when there is no profile selected', async () => {
+  expect.assertions(1)
+  try {
+    await masq.del('key')
+  } catch (e) {
+    expect(e.message).toBe('No profile selected')
+  }
+})
+
+test('put/get should put and get an item', async () => {
+  expect.assertions(1)
+  const key = '/hello'
+  const value = { data: 'world' }
+  masq.setProfile(profile.id)
+  dbTest = hyperdb(rai(profile.id), { valueEncoding: 'json' })
+  // Only for test purpose, we overwrite the data hyperdb
+  masq.dbs[profile.id] = dbTest
+  await masq.put(key, value)
+  const res = await masq.get('/hello')
+  expect(res).toEqual(value)
+})
+
+test('del should del an item', async () => {
+  expect.assertions(1)
+  const key = '/hello'
+  await masq.del(key)
+  const res = await masq.get('/hello')
+  expect(res).toBeUndefined()
 })
