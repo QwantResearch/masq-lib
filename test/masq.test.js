@@ -62,7 +62,6 @@ test('should join a channel', done => {
   sw.on('peer', (peer, id) => {
     expect(sw.peers).toHaveLength(1)
     sw.close()
-    hub.close()
   })
 
   sw.on('close', () => {
@@ -130,7 +129,6 @@ test('should replicate masq-profiles', async (done) => {
 
       expect(json.msg).toBe('replicationProfilesStarted')
       sw.close()
-      hub.close()
     })
 
     peer.send(JSON.stringify({
@@ -146,7 +144,6 @@ test('should replicate masq-profiles', async (done) => {
 
   sw.on('disconnect', (peer, id) => {
     sw.close()
-    hub.close()
     done()
   })
 
@@ -203,7 +200,6 @@ test('should exchange key and authorize local key if challenge matches', async (
 
   sw.on('disconnect', (peer, id) => {
     sw.close()
-    hub.close()
   })
 
   const _handleData = async (data, peer) => {
@@ -213,7 +209,6 @@ test('should exchange key and authorize local key if challenge matches', async (
         expect(json.key).toHaveLength(64)
         // authorize local key & start replication
         sw.close()
-        hub.close()
         break
       default:
         break

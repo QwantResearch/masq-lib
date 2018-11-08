@@ -137,7 +137,6 @@ class Masq {
 
     sw.on('disconnect', (peer, id) => {
       sw.close()
-      hub.close()
     })
 
     const _handleData = async (data, peer) => {
@@ -253,11 +252,12 @@ class Masq {
 
     sw.on('close', () => {
       hub.close()
+      delete this.sws[name]
+      delete this.hubs[name]
     })
 
     sw.on('disconnect', (peer, id) => {
       sw.close()
-      hub.close()
     })
   }
 
