@@ -258,16 +258,6 @@ class Masq {
       const stream = db.replicate({ live: true })
       pump(peer, stream, peer)
     })
-
-    sw.on('close', () => {
-      hub.close()
-      delete this.sws[name]
-      delete this.hubs[name]
-    })
-
-    sw.on('disconnect', (peer, id) => {
-      sw.close()
-    })
   }
 
   /** open and sync existing databases */
