@@ -19,6 +19,7 @@ let dbTest = null
 let profile = {
   id: '123-4566-8789'
 }
+
 beforeAll(async () => {
   server = signalserver()
   server.listen(8080, () => console.log('server running'))
@@ -32,11 +33,6 @@ test('initialize', async () => {
   masq = new Masq()
   await masq.init()
 })
-
-// test('should get empty profiles', async () => {
-//   let profiles = await masq.getProfiles()
-//   expect(profiles).toEqual([])
-// })
 
 test('should generate a pairing link', () => {
   const uuidSize = 36
@@ -266,4 +262,25 @@ test('del should del an item', async () => {
   await masq.del(key)
   const res = await masq.get('/hello')
   expect(res).toBeUndefined()
+})
+
+test('should get empty profiles', async () => {
+  dbTest = hyperdb(rai('masq-profiles'), { valueEncoding: 'json' })
+  masq.dbs.profiles = dbTest
+  let profiles = await masq.getProfiles()
+  expect(profiles).toEqual([])
+})
+
+test('should get one profile', async (done) => {
+  const profile = { username: 'someusername' }
+  const dbTest = hyperdb(rai('dbtest'), { valueEncoding: 'json' })
+  masq.dbs.profiles = dbTest
+  dbTest.put('/profiles', ['id'], () => {
+    dbTest.put('profiles/id', profile, async () => {
+      let profiles = await masq.getProfiles()
+      expect(profiles).toHaveLength(1)
+      expect(profiles[0]).toEqual(profile)
+      done()
+    })
+  })
 })
