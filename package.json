@@ -1,5 +1,5 @@
 {
-  "name": "hypermasq-lib",
+  "name": "masq-lib",
   "version": "0.0.0",
   "description": "",
   "module": "src/index.js",
