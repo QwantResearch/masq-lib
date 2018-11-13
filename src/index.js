@@ -37,12 +37,16 @@ class Masq {
     this._generateLinkParameters()
   }
 
+  /**
+   * @returns {Promise}
+   */
   init () {
     return this._openAndSyncDatabases()
   }
 
   /**
    * Get all profiles registered in masq
+   * @returns {Promise}
    */
   getProfiles () {
     return new Promise((resolve, reject) => {
@@ -76,6 +80,7 @@ class Masq {
   /**
    * Get a value
    * @param {string} key - Key
+   * @returns {Promise}
    */
   get (key) {
     return new Promise((resolve, reject) => {
@@ -93,6 +98,7 @@ class Masq {
    * Put a new value in the current profile database
    * @param {string} key - Key
    * @param {string} value - The value to insert
+   * @returns {Promise}
    */
   put (key, value) {
     return new Promise((resolve, reject) => {
@@ -108,6 +114,7 @@ class Masq {
   /**
    * Delete a key
    * @param {string} key - Key
+   * @returns {Promise}
    */
   del (key) {
     return new Promise((resolve, reject) => {
