@@ -151,7 +151,6 @@ class Masq {
    * If this is the first time, this.dbs.profiles is empty.
    * We need to get masq-profiles hyperdb key of masq.
    */
-
   requestMasqAccess () {
     // Subscribe to channel for a limited time to sync with masq
     const hub = signalhub(this.channel, [HUB_URL])
@@ -207,7 +206,7 @@ class Masq {
   }
 
   /**
-   * After the masq-profiles replication, the right profil is chosen,
+   * After the masq-profiles replication, the right profile is chosen,
    * the next steps are :
    * - getting the hyperdb key from masq
    * - request write authorization by sending the local key
