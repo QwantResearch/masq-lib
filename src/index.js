@@ -77,7 +77,6 @@ class Masq {
     this.profile = id
   }
 
-
   _getDB () {
     if (!this.profile) throw Error('No profile selected')
     let db = this.dbs[this.profile]
@@ -100,8 +99,7 @@ class Masq {
           resolve(nodes[0].value)
         })
       })
-    }
-    catch(err) {
+    } catch (err) {
       return Promise.reject(err)
     }
   }
@@ -121,8 +119,7 @@ class Masq {
           resolve()
         })
       })
-    }
-    catch(err) {
+    } catch (err) {
       return Promise.reject(err)
     }
   }
@@ -141,8 +138,7 @@ class Masq {
           resolve()
         })
       })
-    }
-    catch(err) {
+    } catch (err) {
       return Promise.reject(err)
     }
   }
