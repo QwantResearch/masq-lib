@@ -7,6 +7,21 @@ const pump = require('pump')
 
 const HUB_URL = 'localhost:8080'
 
+const isCreated = (dbName) => {
+  return new Promise((resolve, reject) => {
+    let req = indexedDB.open(dbName)
+    let existed = true
+    req.onsuccess = () => {
+      req.result.close()
+      if (!existed) { indexedDB.deleteDatabase(dbName) }
+      resolve(existed)
+    }
+    req.onupgradeneeded = () => {
+      existed = false
+    }
+  })
+}
+
 /**
  * Return when hyperDb instance is ready
  * @param {Object} db - The hyperDb instance
@@ -265,9 +280,24 @@ class Masq {
   }
 
   /** open and sync existing databases */
-  _openAndSyncDatabases () {
-    // const db = hyperdb(rai('masq-profiles'), { valueEncoding: 'json' })
-    // this.dbs.profiles = db
+  async _openAndSyncDatabases () {
+    if (isCreated('masq-profiles')) {
+      const db = hyperdb(rai('masq-profiles'), { valueEncoding: 'json' })
+      await dbReady(db)
+      this.dbs.profiles = db
+      this._startReplication(db, 'masq-profiles')
+    }
+    let profiles = await this.getProfiles()
+
+    for (let index = 0; index < profiles.length; index++) {
+      let id = profiles[index].id
+      if (isCreated(id)) {
+        const db = hyperdb(rai(id), { valueEncoding: 'json' })
+        await dbReady(db)
+        this.dbs[id] = db
+        this._startReplication(db, id)
+      }
+    }
   }
 
   _generateLinkParameters () {
