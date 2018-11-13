@@ -77,21 +77,33 @@ class Masq {
     this.profile = id
   }
 
+
+  _getDB () {
+    if (!this.profile) throw Error('No profile selected')
+    let db = this.dbs[this.profile]
+    if (!db) throw Error('db does not exist for selected profile')
+    return db
+  }
+
   /**
    * Get a value
    * @param {string} key - Key
    * @returns {Promise}
    */
   get (key) {
-    return new Promise((resolve, reject) => {
-      if (!this.profile) return reject(Error('No profile selected'))
-      const db = this.dbs[this.profile]
-      db.get(key, (err, nodes) => {
-        if (err) return reject(err)
-        if (!nodes.length) return resolve(nodes[0])
-        resolve(nodes[0].value)
+    try {
+      let db = this._getDB();
+      return new Promise((resolve, reject) => {
+        db.get(key, (err, nodes) => {
+          if (err) return reject(err)
+          if (!nodes.length) return resolve(nodes[0])
+          resolve(nodes[0].value)
+        })
       })
-    })
+    }
+    catch(err) {
+      return Promise.reject(err);
+    }
   }
 
   /**
@@ -101,14 +113,18 @@ class Masq {
    * @returns {Promise}
    */
   put (key, value) {
-    return new Promise((resolve, reject) => {
-      if (!this.profile) return reject(Error('No profile selected'))
-      const db = this.dbs[this.profile]
-      db.put(key, value, err => {
-        if (err) return reject(err)
-        resolve()
+    try {
+      let db = this._getDB();
+      return new Promise((resolve, reject) => {
+        db.put(key, value, err => {
+          if (err) return reject(err)
+          resolve()
+        })
       })
-    })
+    }
+    catch(err) {
+      return Promise.reject(err);
+    }
   }
 
   /**
@@ -117,14 +133,18 @@ class Masq {
    * @returns {Promise}
    */
   del (key) {
-    return new Promise((resolve, reject) => {
-      if (!this.profile) return reject(Error('No profile selected'))
-      const db = this.dbs[this.profile]
-      db.del(key, (err) => {
-        if (err) return reject(err)
-        resolve()
+    try {
+      let db = this._getDB();
+      return new Promise((resolve, reject) => {
+        db.del(key, (err) => {
+          if (err) return reject(err)
+          resolve()
+        })
       })
-    })
+    }
+    catch(err) {
+      return Promise.reject(err);
+    }
   }
 
   /**
