@@ -268,7 +268,7 @@ class Masq {
     }
   }
 
-  async _startReplication (db, name) {
+  _startReplication (db, name) {
     const discoveryKey = db.discoveryKey.toString('hex')
     this.hubs[name] = signalhub(discoveryKey, [HUB_URL])
     const hub = this.hubs[name]
