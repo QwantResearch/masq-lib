@@ -150,11 +150,7 @@ class Masq {
     }
   }
 
-  /**
-   * If this is the first time, this.dbs.profiles is empty.
-   * We need to get masq-profiles hyperdb key of masq.
-   */
-  requestMasqAccess () {
+  _initSwarmWithDataHandler (dataHandler) {
     // Subscribe to channel for a limited time to sync with masq
     const hub = signalhub(this.channel, [HUB_URL])
     let sw = null
@@ -166,7 +162,7 @@ class Masq {
     }
 
     sw.on('peer', (peer, id) => {
-      peer.on('data', data => _handleData(data, peer))
+      peer.on('data', data => dataHandler(sw, peer, data))
     })
 
     sw.on('close', () => {
@@ -176,8 +172,14 @@ class Masq {
     sw.on('disconnect', (peer, id) => {
       sw.close()
     })
+  }
 
-    const _handleData = async (data, peer) => {
+  /**
+   * If this is the first time, this.dbs.profiles is empty.
+   * We need to get masq-profiles hyperdb key of masq.
+   */
+  requestMasqAccess () {
+    const handleData = async (sw, peer, data) => {
       const json = JSON.parse(data)
 
       switch (json.msg) {
@@ -206,6 +208,8 @@ class Masq {
           break
       }
     }
+
+    this._initSwarmWithDataHandler(handleData)
   }
 
   /**
@@ -215,31 +219,9 @@ class Masq {
    * - request write authorization by sending the local key
    */
   exchangeDataHyperdbKeys () {
-    // Subscribe to channel for a limited time to sync with masq
     if (!this.profile) throw (Error('No profile selected'))
-    const hub = signalhub(this.channel, [HUB_URL])
-    let sw = null
 
-    if (swarm.WEBRTC_SUPPORT) {
-      sw = swarm(hub)
-    } else {
-      sw = swarm(hub, { wrtc: require('wrtc') })
-    }
-
-    sw.on('peer', (peer, id) => {
-      // check challenges
-      peer.on('data', data => _handleData(data, peer))
-    })
-
-    sw.on('close', () => {
-      hub.close()
-    })
-
-    sw.on('disconnect', (peer, id) => {
-      sw.close()
-    })
-
-    const _handleData = async (data, peer) => {
+    const handleData = async (sw, peer, data) => {
       const json = JSON.parse(data)
 
       switch (json.msg) {
@@ -269,6 +251,7 @@ class Masq {
           break
       }
     }
+    this._initSwarmWithDataHandler(handleData)
   }
 
   _startReplication (db, name) {
