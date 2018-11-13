@@ -92,7 +92,7 @@ class Masq {
    */
   get (key) {
     try {
-      let db = this._getDB();
+      let db = this._getDB()
       return new Promise((resolve, reject) => {
         db.get(key, (err, nodes) => {
           if (err) return reject(err)
@@ -102,7 +102,7 @@ class Masq {
       })
     }
     catch(err) {
-      return Promise.reject(err);
+      return Promise.reject(err)
     }
   }
 
@@ -114,7 +114,7 @@ class Masq {
    */
   put (key, value) {
     try {
-      let db = this._getDB();
+      let db = this._getDB()
       return new Promise((resolve, reject) => {
         db.put(key, value, err => {
           if (err) return reject(err)
@@ -123,7 +123,7 @@ class Masq {
       })
     }
     catch(err) {
-      return Promise.reject(err);
+      return Promise.reject(err)
     }
   }
 
@@ -134,7 +134,7 @@ class Masq {
    */
   del (key) {
     try {
-      let db = this._getDB();
+      let db = this._getDB()
       return new Promise((resolve, reject) => {
         db.del(key, (err) => {
           if (err) return reject(err)
@@ -143,7 +143,7 @@ class Masq {
       })
     }
     catch(err) {
-      return Promise.reject(err);
+      return Promise.reject(err)
     }
   }
 
