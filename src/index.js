@@ -213,7 +213,7 @@ class Masq {
    */
   exchangeDataHyperdbKeys () {
     // Subscribe to channel for a limited time to sync with masq
-    if (!this.profile) throw (new Error('No profile selected'))
+    if (!this.profile) throw (Error('No profile selected'))
     const hub = signalhub(this.channel, [HUB_URL])
     let sw = null
 
