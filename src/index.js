@@ -55,15 +55,22 @@ class Masq {
         if (!nodes.length) return resolve([])
 
         const ids = nodes[0].value
-        const profiles = []
 
+        let promiseArr = []
         for (let id of ids) {
-          this.dbs.profiles.get(`/profiles/${id}`, (err, nodes) => {
-            profiles.push(nodes[0].value)
-            if (err) return reject(err)
-          })
+          promiseArr.push(this.getProfileByID(id))
         }
-        return resolve(profiles)
+        return resolve(Promise.all(promiseArr))
+      })
+    })
+  }
+
+  getProfileByID (id) {
+    return new Promise((resolve, reject) => {
+      this.dbs.profiles.get(`/profiles/${id}`, (err, nodes) => {
+        if (err) return reject(err)
+        if (!nodes || !nodes[0] || !nodes[0].value) return reject(Error('Errooooor : ' + id + ' ; ' + JSON.stringify(nodes)))
+        return resolve(nodes[0].value)
       })
     })
   }
