@@ -61,9 +61,9 @@ class Masq {
           this.dbs.profiles.get(`/profiles/${id}`, (err, nodes) => {
             profiles.push(nodes[0].value)
             if (err) return reject(err)
-            if (ids.length === profiles.length) return resolve(profiles)
           })
         }
+        return resolve(profiles)
       })
     })
   }
