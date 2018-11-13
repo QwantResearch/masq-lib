@@ -37,8 +37,8 @@ class Masq {
     this._generateLinkParameters()
   }
 
-  async init () {
-    await this._openAndSyncDatabases()
+  init () {
+    return this._openAndSyncDatabases()
   }
 
   /**
