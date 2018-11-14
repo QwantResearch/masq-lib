@@ -97,18 +97,14 @@ class Masq {
    * @returns {Promise}
    */
   get (key) {
-    try {
+    return new Promise((resolve, reject) => {
       let db = this._getDB()
-      return new Promise((resolve, reject) => {
-        db.get(key, (err, nodes) => {
-          if (err) return reject(err)
-          if (!nodes.length) return resolve(nodes[0])
-          resolve(nodes[0].value)
-        })
+      db.get(key, (err, nodes) => {
+        if (err) return reject(err)
+        if (!nodes.length) return resolve(nodes[0])
+        resolve(nodes[0].value)
       })
-    } catch (err) {
-      return Promise.reject(err)
-    }
+    })
   }
 
   /**
@@ -118,17 +114,13 @@ class Masq {
    * @returns {Promise}
    */
   put (key, value) {
-    try {
+    return new Promise((resolve, reject) => {
       let db = this._getDB()
-      return new Promise((resolve, reject) => {
-        db.put(key, value, err => {
-          if (err) return reject(err)
-          resolve()
-        })
+      db.put(key, value, err => {
+        if (err) return reject(err)
+        resolve()
       })
-    } catch (err) {
-      return Promise.reject(err)
-    }
+    })
   }
 
   /**
@@ -137,17 +129,13 @@ class Masq {
    * @returns {Promise}
    */
   del (key) {
-    try {
+    return new Promise((resolve, reject) => {
       let db = this._getDB()
-      return new Promise((resolve, reject) => {
-        db.del(key, (err) => {
-          if (err) return reject(err)
-          resolve()
-        })
+      db.del(key, (err) => {
+        if (err) return reject(err)
+        resolve()
       })
-    } catch (err) {
-      return Promise.reject(err)
-    }
+    })
   }
 
   _initSwarmWithDataHandler (dataHandler) {
