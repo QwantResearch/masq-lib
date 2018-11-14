@@ -222,18 +222,6 @@ test('should exchange key and authorize local key if challenge matches', async (
   masq.exchangeDataHyperdbKeys(appName)
 })
 
-/**
- * Return when hyperDb instance is ready
- * @param {Object} db - The hyperDb instance
- */
-const dbReady = (db) => {
-  return new Promise((resolve, reject) => {
-    db.on('ready', () => {
-      resolve()
-    })
-  })
-}
-
 test('put should reject when there is no profile selected', async () => {
   expect.assertions(1)
   masq = new Masq()
