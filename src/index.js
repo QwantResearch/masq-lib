@@ -69,7 +69,7 @@ class Masq {
     return new Promise((resolve, reject) => {
       this.dbs.profiles.get(`/profiles/${id}`, (err, nodes) => {
         if (err) return reject(err)
-        if (!nodes || !nodes[0] || !nodes[0].value) return reject(Error('Errooooor : ' + id + ' ; ' + JSON.stringify(nodes)))
+        if (!nodes || !nodes[0] || !nodes[0].value) return resolve(nodes)
         return resolve(nodes[0].value)
       })
     })
