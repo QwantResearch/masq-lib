@@ -8,7 +8,7 @@ const pump = require('pump')
 const HUB_URL = 'localhost:8080'
 
 const path = require('path')
-const isCreated = require(path.join(__dirname, '/indexedDBUtils')).dBExists
+const dbExists = require(path.join(__dirname, '/indexedDBUtils')).dbExists
 
 /**
  * Return when hyperDb instance is ready
@@ -269,7 +269,7 @@ class Masq {
 
   /** open and sync existing databases */
   async _openAndSyncDatabases () {
-    if (!(await isCreated('masq-profiles'))) {
+    if (!(await dbExists('masq-profiles'))) {
       return
     }
     const db = hyperdb(rai('masq-profiles'), { valueEncoding: 'json' })
@@ -280,7 +280,7 @@ class Masq {
 
     for (let index = 0; index < profiles.length; index++) {
       let id = profiles[index].id
-      if (!(await isCreated(id))) {
+      if (!(await dbExists(id))) {
         continue
       }
       const db = hyperdb(rai(id), { valueEncoding: 'json' })

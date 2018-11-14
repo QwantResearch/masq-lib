@@ -17,7 +17,7 @@ jest.mock('../src/indexedDBUtils', () => {
   const original = require.requireActual('../src/indexedDBUtils')
   return {
     ...original,
-    dBExists: jest.fn(() => false)
+    dbExists: jest.fn(() => false)
   }
 })
 

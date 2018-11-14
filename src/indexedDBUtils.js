@@ -1,4 +1,4 @@
-module.exports.dBExists = function (dbName) {
+module.exports.dbExists = function (dbName) {
   return new Promise((resolve, reject) => {
     let req = global.indexedDB.open(dbName, false)
     let existed = true
