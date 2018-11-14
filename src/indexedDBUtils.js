@@ -10,5 +10,8 @@ module.exports.dbExists = function (dbName) {
     req.onupgradeneeded = () => {
       existed = false
     }
+    req.onerror = (err) => {
+      reject(err)
+    }
   })
 }
