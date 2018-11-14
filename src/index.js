@@ -269,22 +269,24 @@ class Masq {
 
   /** open and sync existing databases */
   async _openAndSyncDatabases () {
-    if (isCreated('masq-profiles')) {
-      const db = hyperdb(rai('masq-profiles'), { valueEncoding: 'json' })
-      await dbReady(db)
-      this.dbs.profiles = db
-      this._startReplication(db, 'masq-profiles')
+    if (!isCreated('masq-profiles')) {
+      return
     }
+    const db = hyperdb(rai('masq-profiles'), { valueEncoding: 'json' })
+    await dbReady(db)
+    this.dbs.profiles = db
+    this._startReplication(db, 'masq-profiles')
     let profiles = await this.getProfiles()
 
     for (let index = 0; index < profiles.length; index++) {
       let id = profiles[index].id
-      if (isCreated(id)) {
-        const db = hyperdb(rai(id), { valueEncoding: 'json' })
-        await dbReady(db)
-        this.dbs[id] = db
-        this._startReplication(db, id)
+      if (!isCreated(id)) {
+        continue
       }
+      const db = hyperdb(rai(id), { valueEncoding: 'json' })
+      await dbReady(db)
+      this.dbs[id] = db
+      this._startReplication(db, id)
     }
   }
 
