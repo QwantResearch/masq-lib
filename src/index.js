@@ -7,20 +7,8 @@ const pump = require('pump')
 
 const HUB_URL = 'localhost:8080'
 
-const isCreated = (dbName) => {
-  return new Promise((resolve, reject) => {
-    let req = indexedDB.open(dbName)
-    let existed = true
-    req.onsuccess = () => {
-      req.result.close()
-      if (!existed) { indexedDB.deleteDatabase(dbName) }
-      resolve(existed)
-    }
-    req.onupgradeneeded = () => {
-      existed = false
-    }
-  })
-}
+const path = require('path')
+const isCreated = require(path.join(__dirname, '/indexedDBUtils')).dBExists
 
 /**
  * Return when hyperDb instance is ready
