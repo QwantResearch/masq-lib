@@ -269,7 +269,7 @@ class Masq {
 
   /** open and sync existing databases */
   async _openAndSyncDatabases () {
-    if (!isCreated('masq-profiles')) {
+    if (!(await isCreated('masq-profiles'))) {
       return
     }
     const db = hyperdb(rai('masq-profiles'), { valueEncoding: 'json' })
@@ -280,7 +280,7 @@ class Masq {
 
     for (let index = 0; index < profiles.length; index++) {
       let id = profiles[index].id
-      if (!isCreated(id)) {
+      if (!(await isCreated(id))) {
         continue
       }
       const db = hyperdb(rai(id), { valueEncoding: 'json' })
