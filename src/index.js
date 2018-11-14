@@ -37,12 +37,16 @@ class Masq {
     this._generateLinkParameters()
   }
 
-  async init () {
-    await this._openAndSyncDatabases()
+  /**
+   * @returns {Promise}
+   */
+  init () {
+    return this._openAndSyncDatabases()
   }
 
   /**
    * Get all profiles registered in masq
+   * @returns {Promise}
    */
   getProfiles () {
     return new Promise((resolve, reject) => {
@@ -51,15 +55,22 @@ class Masq {
         if (!nodes.length) return resolve([])
 
         const ids = nodes[0].value
-        const profiles = []
 
+        let promiseArr = []
         for (let id of ids) {
-          this.dbs.profiles.get(`/profiles/${id}`, (err, nodes) => {
-            profiles.push(nodes[0].value)
-            if (err) return reject(err)
-            if (ids.length === profiles.length) return resolve(profiles)
-          })
+          promiseArr.push(this.getProfileByID(id))
         }
+        return resolve(Promise.all(promiseArr))
+      })
+    })
+  }
+
+  getProfileByID (id) {
+    return new Promise((resolve, reject) => {
+      this.dbs.profiles.get(`/profiles/${id}`, (err, nodes) => {
+        if (err) return reject(err)
+        if (!nodes || !nodes[0] || !nodes[0].value) return resolve(nodes)
+        return resolve(nodes[0].value)
       })
     })
   }
@@ -73,14 +84,21 @@ class Masq {
     this.profile = id
   }
 
+  _getDB () {
+    if (!this.profile) throw Error('No profile selected')
+    let db = this.dbs[this.profile]
+    if (!db) throw Error('db does not exist for selected profile')
+    return db
+  }
+
   /**
    * Get a value
    * @param {string} key - Key
+   * @returns {Promise}
    */
   get (key) {
     return new Promise((resolve, reject) => {
-      if (!this.profile) return reject(Error('No profile selected'))
-      const db = this.dbs[this.profile]
+      let db = this._getDB()
       db.get(key, (err, nodes) => {
         if (err) return reject(err)
         if (!nodes.length) return resolve(nodes[0])
@@ -93,11 +111,11 @@ class Masq {
    * Put a new value in the current profile database
    * @param {string} key - Key
    * @param {string} value - The value to insert
+   * @returns {Promise}
    */
   put (key, value) {
     return new Promise((resolve, reject) => {
-      if (!this.profile) return reject(Error('No profile selected'))
-      const db = this.dbs[this.profile]
+      let db = this._getDB()
       db.put(key, value, err => {
         if (err) return reject(err)
         resolve()
@@ -108,11 +126,11 @@ class Masq {
   /**
    * Delete a key
    * @param {string} key - Key
+   * @returns {Promise}
    */
   del (key) {
     return new Promise((resolve, reject) => {
-      if (!this.profile) return reject(Error('No profile selected'))
-      const db = this.dbs[this.profile]
+      let db = this._getDB()
       db.del(key, (err) => {
         if (err) return reject(err)
         resolve()
@@ -120,12 +138,7 @@ class Masq {
     })
   }
 
-  /**
-   * If this is the first time, this.dbs.profiles is empty.
-   * We need to get masq-profiles hyperdb key of masq.
-   */
-
-  requestMasqAccess () {
+  _initSwarmWithDataHandler (dataHandler) {
     // Subscribe to channel for a limited time to sync with masq
     const hub = signalhub(this.channel, [HUB_URL])
     let sw = null
@@ -137,7 +150,7 @@ class Masq {
     }
 
     sw.on('peer', (peer, id) => {
-      peer.on('data', data => _handleData(data, peer))
+      peer.on('data', data => dataHandler(sw, peer, data))
     })
 
     sw.on('close', () => {
@@ -147,8 +160,14 @@ class Masq {
     sw.on('disconnect', (peer, id) => {
       sw.close()
     })
+  }
 
-    const _handleData = async (data, peer) => {
+  /**
+   * If this is the first time, this.dbs.profiles is empty.
+   * We need to get masq-profiles hyperdb key of masq.
+   */
+  requestMasqAccess () {
+    const handleData = async (sw, peer, data) => {
       const json = JSON.parse(data)
 
       switch (json.msg) {
@@ -177,40 +196,20 @@ class Masq {
           break
       }
     }
+
+    this._initSwarmWithDataHandler(handleData)
   }
 
   /**
-   * After the masq-profiles replication, the right profil is chosen,
+   * After the masq-profiles replication, the right profile is chosen,
    * the next steps are :
    * - getting the hyperdb key from masq
    * - request write authorization by sending the local key
    */
   exchangeDataHyperdbKeys () {
-    // Subscribe to channel for a limited time to sync with masq
-    if (!this.profile) throw (new Error('No profile selected'))
-    const hub = signalhub(this.channel, [HUB_URL])
-    let sw = null
+    if (!this.profile) throw (Error('No profile selected'))
 
-    if (swarm.WEBRTC_SUPPORT) {
-      sw = swarm(hub)
-    } else {
-      sw = swarm(hub, { wrtc: require('wrtc') })
-    }
-
-    sw.on('peer', (peer, id) => {
-      // check challenges
-      peer.on('data', data => _handleData(data, peer))
-    })
-
-    sw.on('close', () => {
-      hub.close()
-    })
-
-    sw.on('disconnect', (peer, id) => {
-      sw.close()
-    })
-
-    const _handleData = async (data, peer) => {
+    const handleData = async (sw, peer, data) => {
       const json = JSON.parse(data)
 
       switch (json.msg) {
@@ -240,9 +239,10 @@ class Masq {
           break
       }
     }
+    this._initSwarmWithDataHandler(handleData)
   }
 
-  async _startReplication (db, name) {
+  _startReplication (db, name) {
     const discoveryKey = db.discoveryKey.toString('hex')
     this.hubs[name] = signalhub(discoveryKey, [HUB_URL])
     const hub = this.hubs[name]

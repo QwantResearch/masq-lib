@@ -31,9 +31,9 @@ The app DB will be used freely by the app developer. We encapsulate the `put/get
 
 ## How it works
 
-1) User need to register a new profile inside Masq. (at masq.qwant.com for instance). Masq will create and sync multiple DBs.
+1) The user needs to register a new profile in Masq (at masq.qwant.com for instance). Masq will create and sync multiple DBs.
 
-2) The user go to a compatible app. As it is the first time he opens this app, the app will provide a unique and secure link to sync `masq-profiles` db ((read-only). Once the user clicks on the link, the app will exchange messages through webrtc with masq to sync the db.
+2) The user goes to a compatible app. As it is the first time he opens this app, the app will provide a unique and secure link to sync the `masq-profiles` db (read-only access is granted to the app). Once the user clicks on the link, the `masq-profiles` db is replicated from masq using webrtc.
 
 3) The app is now able to list the available users. The user can now try to signin with its username/password. As it is the first time, masq-lib will redirect the user to masq to authorize the new app. If the user authorizes the app, a new Database will be created specifically for this couple of user-app, and write-access will be given to the app.
 
