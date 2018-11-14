@@ -7,8 +7,7 @@ const pump = require('pump')
 
 const HUB_URL = 'localhost:8080'
 
-const path = require('path')
-const dbExists = require(path.join(__dirname, '/indexedDBUtils')).dbExists
+const dbExists = require('./indexedDBUtils').dbExists
 
 /**
  * Return when hyperDb instance is ready
