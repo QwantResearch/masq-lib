@@ -4,7 +4,7 @@
   "description": "",
   "module": "src/index.js",
   "scripts": {
-    "test": "jest",
+    "test": "eslint src/ test/ && jest",
     "build": "webpack -p"
   },
   "repository": {
