@@ -13,6 +13,14 @@ const HUB_URL = 'localhost:8080'
 jest.mock('random-access-idb', () =>
   () => require('random-access-memory'))
 
+jest.mock('../src/indexedDBUtils', () => {
+  const original = require.requireActual('../src/indexedDBUtils')
+  return {
+    ...original,
+    dbExists: jest.fn(() => false)
+  }
+})
+
 let server = null
 let masq = null
 let dbTest = null
@@ -31,7 +39,7 @@ afterAll(async () => {
 
 test('initialize', async () => {
   masq = new Masq()
-  await masq.init()
+  masq.init()
 })
 
 test('should generate a pairing link', () => {
@@ -71,7 +79,7 @@ test('should be kicked if challenge does not match', async (done) => {
   expect.assertions(3)
 
   masq = new Masq()
-  await masq.init()
+  masq.init()
 
   const uuidSize = 36
   const link = masq._getLink()
@@ -104,7 +112,7 @@ test('should be kicked if challenge does not match', async (done) => {
 test('should replicate masq-profiles', async (done) => {
   expect.assertions(1)
   masq = new Masq()
-  await masq.init()
+  masq.init()
 
   const challenge = masq.challenge
   const channel = masq.channel
@@ -158,7 +166,7 @@ test('should fail to start key exchange when there is no profile selected', asyn
 test('should exchange key and authorize local key if challenge matches', async (done) => {
   expect.assertions(1)
   masq = new Masq()
-  await masq.init()
+  masq.init()
   // We check which profile corresponds to the current user
   masq.setProfile(profile.id)
 
@@ -217,7 +225,7 @@ test('should exchange key and authorize local key if challenge matches', async (
 test('put should reject when there is no profile selected', async () => {
   expect.assertions(1)
   masq = new Masq()
-  await masq.init()
+  masq.init()
   try {
     await masq.put('key', 'value')
   } catch (e) {

@@ -5,6 +5,8 @@ const hyperdb = require('hyperdb')
 const uuidv4 = require('uuid/v4')
 const pump = require('pump')
 
+const dbExists = require('./indexedDBUtils').dbExists
+
 const HUB_URL = 'localhost:8080'
 
 /**
@@ -265,9 +267,26 @@ class Masq {
   }
 
   /** open and sync existing databases */
-  _openAndSyncDatabases () {
-    // const db = hyperdb(rai('masq-profiles'), { valueEncoding: 'json' })
-    // this.dbs.profiles = db
+  async _openAndSyncDatabases () {
+    if (!(await dbExists('masq-profiles'))) {
+      return
+    }
+    const db = hyperdb(rai('masq-profiles'), { valueEncoding: 'json' })
+    await dbReady(db)
+    this.dbs.profiles = db
+    this._startReplication(db, 'masq-profiles')
+    let profiles = await this.getProfiles()
+
+    for (let index = 0; index < profiles.length; index++) {
+      let id = profiles[index].id
+      if (!(await dbExists(id))) {
+        continue
+      }
+      const db = hyperdb(rai(id), { valueEncoding: 'json' })
+      await dbReady(db)
+      this.dbs[id] = db
+      this._startReplication(db, id)
+    }
   }
 
   _generateLinkParameters () {
