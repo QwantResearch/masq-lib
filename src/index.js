@@ -5,9 +5,9 @@ const hyperdb = require('hyperdb')
 const uuidv4 = require('uuid/v4')
 const pump = require('pump')
 
-const HUB_URL = 'localhost:8080'
-
 const dbExists = require('./indexedDBUtils').dbExists
+
+const HUB_URL = 'localhost:8080'
 
 /**
  * Return when hyperDb instance is ready
