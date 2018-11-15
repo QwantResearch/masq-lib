@@ -24,6 +24,7 @@
     "eslint-plugin-node": "^7.0.1",
     "eslint-plugin-promise": "^4.0.1",
     "eslint-plugin-standard": "^4.0.0",
+    "fake-indexeddb": "^2.0.4",
     "jest": "^23.6.0",
     "random-access-memory": "^3.0.0",
     "webpack": "^4.20.2",
