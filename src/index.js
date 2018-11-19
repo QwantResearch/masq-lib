@@ -8,8 +8,9 @@ const pump = require('pump')
 const dbExists = require('./indexedDBUtils').dbExists
 
 const HUB_URL = 'localhost:8080'
+
 const debug = (str) => {
-  if (process.env.NODE_ENV !== 'production') console.log(str)
+  if (process.env.NODE_ENV === 'development') console.log(str)
 }
 
 /**
