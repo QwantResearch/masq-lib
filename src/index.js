@@ -8,6 +8,7 @@ const pump = require('pump')
 const dbExists = require('./indexedDBUtils').dbExists
 
 const HUB_URL = 'localhost:8080'
+const MASQ_APP_BASE_URL = 'http://localhost:3000'
 
 const debug = (function () {
   switch (process.env.NODE_ENV) {
@@ -45,7 +46,6 @@ class Masq {
     this.dbs = {
       profiles: null // masq public profiles
     }
-    this._generateLinkParameters()
   }
 
   /**
@@ -151,7 +151,7 @@ class Masq {
 
   _initSwarmWithDataHandler (dataHandler) {
     // Subscribe to channel for a limited time to sync with masq
-    debug(`Creation of  a hub with ${this.channel} channel name`)
+    debug(`Creation of a hub with ${this.channel} channel name`)
     const hub = signalhub(this.channel, [HUB_URL])
     let sw = null
 
@@ -178,8 +178,17 @@ class Masq {
   /**
    * If this is the first time, this.dbs.profiles is empty.
    * We need to get masq-profiles hyperdb key of masq.
+   * @returns {string, string, string}
+   *  link - the link to open the masq app with the right
+   *  challenge
+   *  channel
    */
   requestMasqAccess () {
+    // generation of link with new channel and challenge for the sync of new peer
+    const link = this._genGetProfilesLink()
+
+    // TODO generate a QR code with the link
+
     const handleData = async (sw, peer, data) => {
       const json = JSON.parse(data)
 
@@ -213,6 +222,12 @@ class Masq {
     }
 
     this._initSwarmWithDataHandler(handleData)
+
+    return {
+      link: link,
+      challenge: this.challenge,
+      channel: this.channel
+    }
   }
 
   /**
@@ -223,6 +238,9 @@ class Masq {
    */
   exchangeDataHyperdbKeys () {
     if (!this.profile) throw (Error('No profile selected'))
+
+    // generation of link with new channel and challenge for the exchange of keys
+    const link = this._genGetAppDataLink()
 
     const handleData = async (sw, peer, data) => {
       const json = JSON.parse(data)
@@ -256,6 +274,12 @@ class Masq {
       }
     }
     this._initSwarmWithDataHandler(handleData)
+
+    return {
+      link: link,
+      challenge: this.challenge,
+      channel: this.channel
+    }
   }
 
   _startReplication (db, name) {
@@ -304,13 +328,25 @@ class Masq {
     }
   }
 
-  _generateLinkParameters () {
+  _genGetProfilesLink () {
     this.channel = uuidv4()
     this.challenge = uuidv4()
+    const myUrl = new URL(MASQ_APP_BASE_URL)
+    myUrl.searchParams.set('requestType', 'syncProfiles')
+    myUrl.searchParams.set('channel', this.channel)
+    myUrl.searchParams.set('challenge', this.challenge)
+    return myUrl.href
   }
-
-  _getLink () {
-    return `?channel=${this.channel}&challenge=${this.challenge}`
+  _genGetAppDataLink () {
+    this.channel = uuidv4()
+    this.challenge = uuidv4()
+    const myUrl = new URL(MASQ_APP_BASE_URL)
+    myUrl.searchParams.set('requestType', 'syncAppData')
+    myUrl.searchParams.set('channel', this.channel)
+    myUrl.searchParams.set('challenge', this.challenge)
+    myUrl.searchParams.set('appName', this.app)
+    myUrl.searchParams.set('profileID', this.profileID)
+    return myUrl.href
   }
 }
 
