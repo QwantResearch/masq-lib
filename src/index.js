@@ -6,6 +6,7 @@ const uuidv4 = require('uuid/v4')
 const pump = require('pump')
 
 const dbExists = require('./indexedDBUtils').dbExists
+const promiseHyperdb = require('./promiseHyperdb')
 
 const HUB_URL = 'localhost:8080'
 const MASQ_APP_BASE_URL = 'http://localhost:3000'
@@ -59,31 +60,23 @@ class Masq {
    * Get all profiles registered in masq
    * @returns {Promise}
    */
-  getProfiles () {
-    return new Promise((resolve, reject) => {
-      this.dbs.profiles.get('/profiles', (err, nodes) => {
-        if (err) return reject(err)
-        if (!nodes.length) return resolve([])
-        const ids = nodes[0].value
-        debug(`profiles ids, ${JSON.stringify(ids)}`)
+  async getProfiles () {
+    const nodes = await promiseHyperdb.get(this.dbs.profiles, '/profiles')
+    if (!nodes.length) return []
+    const ids = nodes[0].value
+    debug(`profiles ids, ${JSON.stringify(ids)}`)
 
-        let promiseArr = []
-        for (let id of ids) {
-          promiseArr.push(this.getProfileByID(id))
-        }
-        return resolve(Promise.all(promiseArr))
-      })
-    })
+    let promiseArr = []
+    for (let id of ids) {
+      promiseArr.push(this.getProfileByID(id))
+    }
+    return Promise.all(promiseArr)
   }
 
-  getProfileByID (id) {
-    return new Promise((resolve, reject) => {
-      this.dbs.profiles.get(`/profiles/${id}`, (err, nodes) => {
-        if (err) return reject(err)
-        if (!nodes || !nodes[0] || !nodes[0].value) return resolve(nodes)
-        return resolve(nodes[0].value)
-      })
-    })
+  async getProfileByID (id) {
+    const nodes = await promiseHyperdb.get(this.dbs.profiles, `/profiles/${id}`)
+    if (!nodes || !nodes[0] || !nodes[0].value) return nodes
+    return nodes[0].value
   }
 
   /**
@@ -107,15 +100,11 @@ class Masq {
    * @param {string} key - Key
    * @returns {Promise}
    */
-  get (key) {
-    return new Promise((resolve, reject) => {
-      let db = this._getDB()
-      db.get(key, (err, nodes) => {
-        if (err) return reject(err)
-        if (!nodes.length) return resolve(nodes[0])
-        resolve(nodes[0].value)
-      })
-    })
+  async get (key) {
+    let db = this._getDB()
+    const nodes = await promiseHyperdb.get(db, key)
+    if (!nodes.length) return nodes[0]
+    return nodes[0].value
   }
 
   /**
@@ -124,14 +113,9 @@ class Masq {
    * @param {string} value - The value to insert
    * @returns {Promise}
    */
-  put (key, value) {
-    return new Promise((resolve, reject) => {
-      let db = this._getDB()
-      db.put(key, value, err => {
-        if (err) return reject(err)
-        resolve()
-      })
-    })
+  async put (key, value) {
+    let db = this._getDB()
+    return promiseHyperdb.put(db, key, value)
   }
 
   /**
@@ -139,14 +123,9 @@ class Masq {
    * @param {string} key - Key
    * @returns {Promise}
    */
-  del (key) {
-    return new Promise((resolve, reject) => {
-      let db = this._getDB()
-      db.del(key, (err) => {
-        if (err) return reject(err)
-        resolve()
-      })
-    })
+  async del (key) {
+    let db = this._getDB()
+    return promiseHyperdb.put(db, key)
   }
 
   _initSwarmWithDataHandler (dataHandler) {
