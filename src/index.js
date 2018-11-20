@@ -8,9 +8,15 @@ const pump = require('pump')
 const dbExists = require('./indexedDBUtils').dbExists
 
 const HUB_URL = 'localhost:8080'
-const debug = (str) => {
-  if (process.env.NODE_ENV !== 'production') console.log(str)
-}
+
+const debug = (function () {
+  switch (process.env.NODE_ENV) {
+    case ('development'):
+      return console.log
+    default:
+      return () => {}
+  }
+})()
 
 /**
  * Return when hyperDb instance is ready
