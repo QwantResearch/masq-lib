@@ -5,7 +5,6 @@ const hyperdb = require('hyperdb')
 const uuidv4 = require('uuid/v4')
 const pump = require('pump')
 
-const dbExists = require('./indexedDBUtils').dbExists
 const promiseHyperdb = require('./promiseHyperdb')
 
 const HUB_URL = 'localhost:8080'
@@ -19,18 +18,6 @@ const debug = (function () {
       return () => {}
   }
 })()
-
-/**
- * Return when hyperDb instance is ready
- * @param {Object} db - The hyperDb instance
- */
-const dbReady = (db) => {
-  return new Promise((resolve, reject) => {
-    db.on('ready', () => {
-      resolve()
-    })
-  })
-}
 
 class Masq {
   /**
@@ -182,7 +169,7 @@ class Masq {
             // db creation
             debug(`Creation of hyperdb masq-profiles with the received key ${json.key.slice(0, 5)}`)
             const db = hyperdb(rai('masq-profiles'), Buffer.from(json.key, 'hex'), { valueEncoding: 'json' })
-            await dbReady(db)
+            await promiseHyperdb.ready(db)
 
             // Store
             this.dbs.profiles = db
@@ -233,7 +220,7 @@ class Masq {
             // db creation and replication
             debug(`Creation of data hyperdb ${this.profile}`)
             const db = hyperdb(rai(this.profile), Buffer.from(json.key, 'hex'), { valueEncoding: 'json' })
-            await dbReady(db)
+            await promiseHyperdb.ready(db)
             // Store
             this.dbs[this.profile] = db
 
@@ -286,22 +273,22 @@ class Masq {
 
   /** open and sync existing databases */
   async _openAndSyncDatabases () {
-    if (!(await dbExists('masq-profiles'))) {
+    if (!(await promiseHyperdb.dbExists('masq-profiles'))) {
       return
     }
     const db = hyperdb(rai('masq-profiles'), { valueEncoding: 'json' })
-    await dbReady(db)
+    await promiseHyperdb.ready(db)
     this.dbs.profiles = db
     this._startReplication(db, 'masq-profiles')
     let profiles = await this.getProfiles()
 
     for (let index = 0; index < profiles.length; index++) {
       let id = profiles[index].id
-      if (!(await dbExists(id))) {
+      if (!(await promiseHyperdb.dbExists(id))) {
         continue
       }
       const db = hyperdb(rai(id), { valueEncoding: 'json' })
-      await dbReady(db)
+      await promiseHyperdb.ready(db)
       this.dbs[id] = db
       this._startReplication(db, id)
     }
