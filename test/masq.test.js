@@ -8,13 +8,14 @@ const hyperdb = require('hyperdb')
 const Masq = require('../src')
 
 const HUB_URL = 'localhost:8080'
+const APP_NAME = 'app1'
 
 // user an in memory random-access-storage instead
 jest.mock('random-access-idb', () =>
   () => require('random-access-memory'))
 
-jest.mock('../src/indexedDBUtils', () => {
-  const original = require.requireActual('../src/indexedDBUtils')
+jest.mock('../src/promiseHyperdb', () => {
+  const original = require.requireActual('../src/promiseHyperdb')
   return {
     ...original,
     dbExists: jest.fn(() => false)
