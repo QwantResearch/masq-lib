@@ -140,7 +140,7 @@ class Masq {
     })
   }
 
-  _initSwarmWithDataHandler (dataHandler) {
+  _initSwarmWithDataHandler (dataHandler, initalMessage) {
     // Subscribe to channel for a limited time to sync with masq
     const hub = signalhub(this.channel, [HUB_URL])
     let sw = null
@@ -152,6 +152,7 @@ class Masq {
     }
 
     sw.on('peer', (peer, id) => {
+      if (initalMessage) { peer.send(initalMessage) }
       peer.on('data', data => dataHandler(sw, peer, data))
     })
 
