@@ -8,6 +8,9 @@ const pump = require('pump')
 const dbExists = require('./indexedDBUtils').dbExists
 
 const HUB_URL = 'localhost:8080'
+const debug = (str) => {
+  if (process.env.NODE_ENV !== 'production') console.log(str)
+}
 
 /**
  * Return when hyperDb instance is ready
@@ -55,8 +58,8 @@ class Masq {
       this.dbs.profiles.get('/profiles', (err, nodes) => {
         if (err) return reject(err)
         if (!nodes.length) return resolve([])
-
         const ids = nodes[0].value
+        debug(`profiles ids, ${JSON.stringify(ids)}`)
 
         let promiseArr = []
         for (let id of ids) {
@@ -142,6 +145,7 @@ class Masq {
 
   _initSwarmWithDataHandler (dataHandler, initalMessage) {
     // Subscribe to channel for a limited time to sync with masq
+    debug(`Creation of  a hub with ${this.channel} channel name`)
     const hub = signalhub(this.channel, [HUB_URL])
     let sw = null
 
@@ -153,6 +157,7 @@ class Masq {
 
     sw.on('peer', (peer, id) => {
       if (initalMessage) { peer.send(initalMessage) }
+      debug(`The peer ${id} join us...`)
       peer.on('data', data => dataHandler(sw, peer, data))
     })
 
@@ -177,10 +182,12 @@ class Masq {
         case 'sendProfilesKey':
           // check challenges
           if (json.challenge !== this.challenge) {
+            debug('challenge mismatches')
             // This peer may be malicious, close the connection
             sw.close()
           } else {
             // db creation
+            debug(`Creation of hyperdb masq-profiles with the received key ${json.key.slice(0, 5)}`)
             const db = hyperdb(rai('masq-profiles'), Buffer.from(json.key, 'hex'), { valueEncoding: 'json' })
             await dbReady(db)
 
@@ -231,6 +238,7 @@ class Masq {
             sw.close()
           } else {
             // db creation and replication
+            debug(`Creation of data hyperdb ${this.profile}`)
             const db = hyperdb(rai(this.profile), Buffer.from(json.key, 'hex'), { valueEncoding: 'json' })
             await dbReady(db)
             // Store
@@ -255,6 +263,7 @@ class Masq {
   }
 
   _startReplication (db, name) {
+    debug(`Start replication for ${name}`)
     const discoveryKey = db.discoveryKey.toString('hex')
     this.hubs[name] = signalhub(discoveryKey, [HUB_URL])
     const hub = this.hubs[name]
