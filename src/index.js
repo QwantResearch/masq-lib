@@ -29,10 +29,6 @@ class Masq {
     this.sws = {}
     this.hubs = {}
     this.appName = appName
-    this.getProfilesChannel = null
-    this.getProfilesChallenge = null
-    this.getAppDataChannel = null
-    this.getAppDataChallenge = null
     this.dbs = {
       profiles: null // masq public profiles
     }
@@ -165,7 +161,7 @@ class Masq {
    */
   requestMasqAccess () {
     // generation of link with new channel and challenge for the sync of new peer
-    const link = this._genGetProfilesLink()
+    const { link, channel, challenge } = this._genGetProfilesLink()
 
     // TODO generate a QR code with the link
 
@@ -175,7 +171,7 @@ class Masq {
       switch (json.msg) {
         case 'sendProfilesKey':
           // check challenges
-          if (json.challenge !== this.getProfilesChallenge) {
+          if (json.challenge !== challenge) {
             // This peer may be malicious, close the connection
             sw.close()
           } else {
@@ -200,15 +196,15 @@ class Masq {
       }
     }
 
-    this._initSwarmWithDataHandler(this.getProfilesChannel, handleData).then(() => {
+    this._initSwarmWithDataHandler(channel, handleData).then(() => {
       this._requestMasqAccessDone = true
       if (this._onRequestMasqAccessDone) this._onRequestMasqAccessDone()
     })
 
     return {
-      channel: this.getProfilesChannel,
-      challenge: this.getProfilesChallenge,
-      link: link
+      channel,
+      challenge,
+      link
     }
   }
 
@@ -235,7 +231,7 @@ class Masq {
     }
 
     // generation of link with new channel and challenge for the exchange of keys
-    const link = this._genGetAppDataLink()
+    const { link, channel, challenge } = this._genGetAppDataLink()
 
     const appInfoMessage = JSON.stringify({
       ...appInfo, msg: 'appInfo'
@@ -246,7 +242,7 @@ class Masq {
 
       switch (json.msg) {
         case 'sendDataKey':
-          if (json.challenge !== this.getAppDataChallenge) {
+          if (json.challenge !== challenge) {
             // This peer may be malicious, close the connection
             sw.close()
             break
@@ -265,7 +261,7 @@ class Masq {
           break
 
         case 'ready':
-          if (json.challenge !== this.getAppDataChallenge) {
+          if (json.challenge !== challenge) {
             // This peer may be malicious, close the connection
             sw.close()
             break
@@ -278,15 +274,15 @@ class Masq {
           break
       }
     }
-    this._initSwarmWithDataHandler(this.getAppDataChannel, handleData, appInfoMessage).then(() => {
+    this._initSwarmWithDataHandler(channel, handleData, appInfoMessage).then(() => {
       this._exchangeDataDone = true
       if (this._onExchangeDone) this._onExchangeDone()
     })
 
     return {
-      channel: this.getAppDataChannel,
-      challenge: this.getAppDataChallenge,
-      link: link
+      channel,
+      challenge,
+      link
     }
   }
 
@@ -344,24 +340,32 @@ class Masq {
   }
 
   _genGetProfilesLink () {
-    this.getProfilesChannel = uuidv4()
-    this.getProfilesChallenge = uuidv4()
+    const channel = uuidv4()
+    const challenge = uuidv4()
     const myUrl = new URL(MASQ_APP_BASE_URL)
     myUrl.searchParams.set('requestType', 'syncProfiles')
-    myUrl.searchParams.set('channel', this.getProfilesChannel)
-    myUrl.searchParams.set('challenge', this.getProfilesChallenge)
-    return myUrl.href
+    myUrl.searchParams.set('channel', channel)
+    myUrl.searchParams.set('challenge', challenge)
+    return {
+      link: myUrl.href,
+      channel,
+      challenge
+    }
   }
   _genGetAppDataLink () {
-    this.getAppDataChannel = uuidv4()
-    this.getAppDataChallenge = uuidv4()
+    const channel = uuidv4()
+    const challenge = uuidv4()
     const myUrl = new URL(MASQ_APP_BASE_URL)
     myUrl.searchParams.set('requestType', 'syncAppData')
-    myUrl.searchParams.set('channel', this.getAppDataChannel)
-    myUrl.searchParams.set('challenge', this.getAppDataChallenge)
+    myUrl.searchParams.set('channel', channel)
+    myUrl.searchParams.set('challenge', challenge)
     myUrl.searchParams.set('appName', this.appName)
     myUrl.searchParams.set('profileID', this.profileID)
-    return myUrl.href
+    return {
+      link: myUrl.href,
+      channel,
+      challenge
+    }
   }
 }
 
