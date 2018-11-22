@@ -45,6 +45,15 @@ class Masq {
     return this._openAndSyncDatabases()
   }
 
+  destroy () {
+    const prArr = Object.values(this.sws).map(sw => {
+      return new Promise((resolve, reject) => {
+        sw.close(resolve)
+      })
+    })
+    return Promise.all(prArr)
+  }
+
   /**
    * Get all profiles registered in masq
    * @returns {Promise}
