@@ -126,7 +126,7 @@ class Masq {
     return promiseHyperdb.put(db, key)
   }
 
-  async _initSwarmWithDataHandler (channel, dataHandler, tmp) {
+  async _initSwarmWithDataHandler (channel, dataHandler) {
     return new Promise((resolve, reject) => {
       // Subscribe to channel for a limited time to sync with masq
       debug(`Creation of a hub with ${channel} channel name`)
@@ -199,7 +199,7 @@ class Masq {
       }
     }
 
-    this._initSwarmWithDataHandler(this.getProfilesChannel, handleData, 'requestMasqAccess').then(() => {
+    this._initSwarmWithDataHandler(this.getProfilesChannel, handleData).then(() => {
       this._requestMasqAccessDone = true
       if (this._onRequestMasqAccessDone) this._onRequestMasqAccessDone()
     })
@@ -271,7 +271,7 @@ class Masq {
           break
       }
     }
-    this._initSwarmWithDataHandler(this.getAppDataChannel, handleData, 'exchangeData').then(() => {
+    this._initSwarmWithDataHandler(this.getAppDataChannel, handleData).then(() => {
       this._exchangeDataDone = true
       if (this._onExchangeDone) this._onExchangeDone()
     })
