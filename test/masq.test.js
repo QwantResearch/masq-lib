@@ -164,7 +164,7 @@ test('should fail to start key exchange when there is no profile selected', asyn
 })
 
 test('should exchange key and authorize local key if challenge matches', async (done) => {
-  expect.assertions(1)
+  expect.assertions(4)
   masq = new Masq()
   await masq.init()
   // We check which profile corresponds to the current user
@@ -173,6 +173,12 @@ test('should exchange key and authorize local key if challenge matches', async (
   const challenge = masq.challenge
   const channel = masq.channel
   const appName = 'app1'
+  const key = 'c4b60362325d27ad3c04db158fa68fe6fde00387467708ab3a0be79c811b3825'
+  const appInfo = {
+    name: appName,
+    description: 'A wonderful app',
+    image: ' a link to image'
+  }
   /***
    * A link must be created (and sent to masq) containing :
    *  type: 'syncData',
@@ -186,15 +192,8 @@ test('should exchange key and authorize local key if challenge matches', async (
 
   sw.on('peer', (peer, id) => {
     // create hyperdb for the requested service and send the key
-    const key = 'c4b60362325d27ad3c04db158fa68fe6fde00387467708ab3a0be79c811b3825'
 
     peer.on('data', data => _handleData(data, peer))
-
-    peer.send(JSON.stringify({
-      msg: 'sendDataKey',
-      challenge: challenge,
-      key: key
-    }))
   })
 
   sw.on('close', () => {
@@ -214,12 +213,22 @@ test('should exchange key and authorize local key if challenge matches', async (
         // authorize local key & start replication
         sw.close()
         break
+      case 'appInfo':
+        expect(json.name).toBe(appInfo.name)
+        expect(json.description).toBe(appInfo.description)
+        expect(json.image).toBe(appInfo.image)
+        peer.send(JSON.stringify({
+          msg: 'sendDataKey',
+          challenge: challenge,
+          key: key
+        }))
+        break
       default:
         break
     }
   }
 
-  masq.exchangeDataHyperdbKeys(appName)
+  masq.exchangeDataHyperdbKeys(appInfo)
 })
 
 test('put should reject when there is no profile selected', async () => {
