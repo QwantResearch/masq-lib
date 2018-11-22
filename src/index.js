@@ -206,11 +206,20 @@ class Masq {
   /**
    * After the masq-profiles replication, the right profile is chosen,
    * the next steps are :
+   * - sending the appInfo
    * - getting the hyperdb key from masq
    * - request write authorization by sending the local key
+   * @param {Object} appInfo - The application info : name, description and image
+   * @param {string} value - The value to insert
+   * @returns {Promise}
    */
-  exchangeDataHyperdbKeys () {
+
+  exchangeDataHyperdbKeys (appInfo) {
     if (!this.profile) throw (Error('No profile selected'))
+
+    const appInfoMessage = JSON.stringify({
+      ...appInfo, msg: 'appInfo'
+    })
 
     const handleData = async (sw, peer, data) => {
       const json = JSON.parse(data)
@@ -242,7 +251,7 @@ class Masq {
           break
       }
     }
-    this._initSwarmWithDataHandler(handleData)
+    this._initSwarmWithDataHandler(handleData, appInfoMessage)
   }
 
   _startReplication (db, name) {
