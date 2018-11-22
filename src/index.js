@@ -29,8 +29,10 @@ class Masq {
     this.sws = {}
     this.hubs = {}
     this.app = app
-    this.channel = null
-    this.challenge = null
+    this.getProfilesChannel = null
+    this.getProfilesChallenge = null
+    this.getAppDataChannel = null
+    this.getAppDataChallenge = null
     this.dbs = {
       profiles: null // masq public profiles
     }
@@ -115,29 +117,31 @@ class Masq {
     return promiseHyperdb.put(db, key)
   }
 
-  _initSwarmWithDataHandler (dataHandler) {
-    // Subscribe to channel for a limited time to sync with masq
-    debug(`Creation of a hub with ${this.channel} channel name`)
-    const hub = signalhub(this.channel, [HUB_URL])
-    let sw = null
+  async _initSwarmWithDataHandler (channel, dataHandler, tmp) {
+    return new Promise((resolve, reject) => {
+      // Subscribe to channel for a limited time to sync with masq
+      debug(`Creation of a hub with ${channel} channel name`)
+      const hub = signalhub(channel, [HUB_URL])
+      let sw = null
 
-    if (swarm.WEBRTC_SUPPORT) {
-      sw = swarm(hub)
-    } else {
-      sw = swarm(hub, { wrtc: require('wrtc') })
-    }
+      if (swarm.WEBRTC_SUPPORT) {
+        sw = swarm(hub)
+      } else {
+        sw = swarm(hub, { wrtc: require('wrtc') })
+      }
 
-    sw.on('peer', (peer, id) => {
-      debug(`The peer ${id} join us...`)
-      peer.on('data', data => dataHandler(sw, peer, data))
-    })
+      sw.on('peer', (peer, id) => {
+        debug(`The peer ${id} join us...`)
+        peer.on('data', (data) => { dataHandler(sw, peer, data) })
+      })
 
-    sw.on('close', () => {
-      hub.close()
-    })
+      sw.on('disconnect', (peer, id) => {
+        sw.close()
+      })
 
-    sw.on('disconnect', (peer, id) => {
-      sw.close()
+      sw.on('close', () => {
+        resolve()
+      })
     })
   }
 
@@ -161,8 +165,7 @@ class Masq {
       switch (json.msg) {
         case 'sendProfilesKey':
           // check challenges
-          if (json.challenge !== this.challenge) {
-            debug('challenge mismatches')
+          if (json.challenge !== this.getProfilesChallenge) {
             // This peer may be malicious, close the connection
             sw.close()
           } else {
@@ -187,13 +190,23 @@ class Masq {
       }
     }
 
-    this._initSwarmWithDataHandler(handleData)
+    this._initSwarmWithDataHandler(this.getProfilesChannel, handleData, 'requestMasqAccess').then(() => {
+      this._requestMasqAccessDone = true
+      if (this._onRequestMasqAccessDone) this._onRequestMasqAccessDone()
+    })
 
     return {
-      link: link,
-      challenge: this.challenge,
-      channel: this.channel
+      channel: this.getProfilesChannel,
+      challenge: this.getProfilesChallenge,
+      link: link
     }
+  }
+
+  requestMasqAccessDone () {
+    return new Promise((resolve, reject) => {
+      if (this._requestMasqAccessDone) return resolve()
+      this._onRequestMasqAccessDone = resolve
+    })
   }
 
   /**
@@ -203,7 +216,11 @@ class Masq {
    * - request write authorization by sending the local key
    */
   exchangeDataHyperdbKeys () {
-    if (!this.profile) throw (Error('No profile selected'))
+    this._exchangeDataDone = false
+    if (!this.profile) {
+      this._exchangeDataDone = true
+      throw (Error('No profile selected'))
+    }
 
     // generation of link with new channel and challenge for the exchange of keys
     const link = this._genGetAppDataLink()
@@ -213,24 +230,30 @@ class Masq {
 
       switch (json.msg) {
         case 'sendDataKey':
-          if (json.challenge !== this.challenge) {
+          if (json.challenge !== this.getAppDataChallenge) {
             // This peer may be malicious, close the connection
             sw.close()
-          } else {
-            // db creation and replication
-            debug(`Creation of data hyperdb ${this.profile}`)
-            const db = hyperdb(rai(this.profile), Buffer.from(json.key, 'hex'), { valueEncoding: 'json' })
-            await promiseHyperdb.ready(db)
-            // Store
-            this.dbs[this.profile] = db
-
-            peer.send(JSON.stringify({
-              msg: 'requestWriteAccess',
-              key: db.local.key.toString('hex')
-            }))
+            break
           }
+
+          // db creation and replication
+          const db = hyperdb(rai(this.profile), Buffer.from(json.key, 'hex'), { valueEncoding: 'json' })
+          await promiseHyperdb.ready(db)
+          // Store
+          this.dbs[this.profile] = db
+
+          peer.send(JSON.stringify({
+            msg: 'requestWriteAccess',
+            key: db.local.key.toString('hex')
+          }))
           break
+
         case 'ready':
+          if (json.challenge !== this.getAppDataChallenge) {
+            // This peer may be malicious, close the connection
+            sw.close()
+            break
+          }
           // Masq must send ready after the authorization
           this._startReplication(this.dbs[this.profile], this.profile)
           sw.close()
@@ -239,13 +262,23 @@ class Masq {
           break
       }
     }
-    this._initSwarmWithDataHandler(handleData)
+    this._initSwarmWithDataHandler(this.getAppDataChannel, handleData, 'exchangeData').then(() => {
+      this._exchangeDataDone = true
+      if (this._onExchangeDone) this._onExchangeDone()
+    })
 
     return {
-      link: link,
-      challenge: this.challenge,
-      channel: this.channel
+      channel: this.getAppDataChannel,
+      challenge: this.getAppDataChallenge,
+      link: link
     }
+  }
+
+  exchangeDataHyperdbKeysDone () {
+    return new Promise((resolve, reject) => {
+      if (this._exchangeDataDone) return resolve()
+      this._onExchangeDone = resolve
+    })
   }
 
   _startReplication (db, name) {
@@ -295,21 +328,21 @@ class Masq {
   }
 
   _genGetProfilesLink () {
-    this.channel = uuidv4()
-    this.challenge = uuidv4()
+    this.getProfilesChannel = uuidv4()
+    this.getProfilesChallenge = uuidv4()
     const myUrl = new URL(MASQ_APP_BASE_URL)
     myUrl.searchParams.set('requestType', 'syncProfiles')
-    myUrl.searchParams.set('channel', this.channel)
-    myUrl.searchParams.set('challenge', this.challenge)
+    myUrl.searchParams.set('channel', this.getProfilesChannel)
+    myUrl.searchParams.set('challenge', this.getProfilesChallenge)
     return myUrl.href
   }
   _genGetAppDataLink () {
-    this.channel = uuidv4()
-    this.challenge = uuidv4()
+    this.getAppDataChannel = uuidv4()
+    this.getAppDataChallenge = uuidv4()
     const myUrl = new URL(MASQ_APP_BASE_URL)
     myUrl.searchParams.set('requestType', 'syncAppData')
-    myUrl.searchParams.set('channel', this.channel)
-    myUrl.searchParams.set('challenge', this.challenge)
+    myUrl.searchParams.set('channel', this.getAppDataChannel)
+    myUrl.searchParams.set('challenge', this.getAppDataChallenge)
     myUrl.searchParams.set('appName', this.app)
     myUrl.searchParams.set('profileID', this.profileID)
     return myUrl.href
