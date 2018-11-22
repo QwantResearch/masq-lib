@@ -222,10 +222,12 @@ class Masq {
   /**
    * After the masq-profiles replication, the right profile is chosen,
    * the next steps are :
+   * - sending the appInfo
    * - getting the hyperdb key from masq
    * - request write authorization by sending the local key
+   * @param {Object} appInfo - The application info : name, description and image
    */
-  exchangeDataHyperdbKeys () {
+  exchangeDataHyperdbKeys (appInfo) {
     this._exchangeDataDone = false
     if (!this.profile) {
       this._exchangeDataDone = true
@@ -234,6 +236,10 @@ class Masq {
 
     // generation of link with new channel and challenge for the exchange of keys
     const link = this._genGetAppDataLink()
+
+    const appInfoMessage = JSON.stringify({
+      ...appInfo, msg: 'appInfo'
+    })
 
     const handleData = async (sw, peer, data) => {
       const json = JSON.parse(data)
@@ -272,7 +278,7 @@ class Masq {
           break
       }
     }
-    this._initSwarmWithDataHandler(this.getAppDataChannel, handleData).then(() => {
+    this._initSwarmWithDataHandler(this.getAppDataChannel, handleData, appInfoMessage).then(() => {
       this._exchangeDataDone = true
       if (this._onExchangeDone) this._onExchangeDone()
     })
