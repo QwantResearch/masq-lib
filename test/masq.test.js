@@ -215,12 +215,18 @@ test('should fail to start key exchange when there is no profile selected', asyn
 
 test('should exchange key and authorize local key if challenge matches', async () => {
   await _initProfilesReplication()
-  expect.assertions(1)
+  expect.assertions(4)
   // We check which profile corresponds to the current user
   const pr = new Promise((resolve, reject) => {
     masq.setProfile(profile.id)
 
-    const { challenge, channel } = masq.exchangeDataHyperdbKeys()
+    const appInfo = {
+      name: masq.app,
+      description: 'A wonderful app',
+      image: ' a link to image'
+    }
+
+    const { challenge, channel } = masq.exchangeDataHyperdbKeys(appInfo)
 
     // simulating masq app
     const hub = signalhub(channel, [HUB_URL])
@@ -232,6 +238,16 @@ test('should exchange key and authorize local key if challenge matches', async (
       peer.on('data', data => {
         const json = JSON.parse(data)
         switch (json.msg) {
+          case 'appInfo':
+            expect(json.name).toBe(appInfo.name)
+            expect(json.description).toBe(appInfo.description)
+            expect(json.image).toBe(appInfo.image)
+            peer.send(JSON.stringify({
+              msg: 'sendDataKey',
+              challenge: challenge,
+              key: key
+            }))
+            break
           case 'requestWriteAccess':
             expect(json.key).toHaveLength(64)
             // authorize local key & start replication
@@ -245,12 +261,6 @@ test('should exchange key and authorize local key if challenge matches', async (
             break
         }
       })
-
-      peer.send(JSON.stringify({
-        msg: 'sendDataKey',
-        challenge: challenge,
-        key: key
-      }))
     })
 
     sw.on('close', () => {
