@@ -126,7 +126,7 @@ class Masq {
     return promiseHyperdb.put(db, key)
   }
 
-  async _initSwarmWithDataHandler (channel, dataHandler) {
+  async _initSwarmWithDataHandler (channel, dataHandler, initialMessage) {
     return new Promise((resolve, reject) => {
       // Subscribe to channel for a limited time to sync with masq
       debug(`Creation of a hub with ${channel} channel name`)
@@ -141,6 +141,7 @@ class Masq {
 
       sw.on('peer', (peer, id) => {
         debug(`The peer ${id} join us...`)
+        if (initialMessage) { peer.send(initialMessage) }
         peer.on('data', (data) => { dataHandler(sw, peer, data) })
       })
 
