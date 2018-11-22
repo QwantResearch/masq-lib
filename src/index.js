@@ -293,8 +293,8 @@ class Masq {
   _startReplication (db, name) {
     debug(`Start replication for ${name}`)
     const discoveryKey = db.discoveryKey.toString('hex')
-    this.hubs[name] = signalhub(discoveryKey, [HUB_URL])
-    const hub = this.hubs[name]
+    const hub = signalhub(discoveryKey, [HUB_URL])
+    this.hubs[name] = hub
 
     if (swarm.WEBRTC_SUPPORT) {
       this.sws[name] = swarm(hub)
