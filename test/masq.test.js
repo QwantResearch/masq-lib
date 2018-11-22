@@ -221,7 +221,7 @@ test('should exchange key and authorize local key if challenge matches', async (
     masq.setProfile(profile.id)
 
     const appInfo = {
-      name: masq.app,
+      name: masq.appName,
       description: 'A wonderful app',
       image: ' a link to image'
     }
