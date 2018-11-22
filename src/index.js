@@ -22,13 +22,13 @@ const debug = (function () {
 class Masq {
   /**
    * constructor
-   * @param {string} app - The application name
+   * @param {string} appName - The application name
    */
-  constructor (app) {
+  constructor (appName) {
     this.profile = null
     this.sws = {}
     this.hubs = {}
-    this.app = app
+    this.appName = appName
     this.getProfilesChannel = null
     this.getProfilesChallenge = null
     this.getAppDataChannel = null
@@ -359,7 +359,7 @@ class Masq {
     myUrl.searchParams.set('requestType', 'syncAppData')
     myUrl.searchParams.set('channel', this.getAppDataChannel)
     myUrl.searchParams.set('challenge', this.getAppDataChallenge)
-    myUrl.searchParams.set('appName', this.app)
+    myUrl.searchParams.set('appName', this.appName)
     myUrl.searchParams.set('profileID', this.profileID)
     return myUrl.href
   }
