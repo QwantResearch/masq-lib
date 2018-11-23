@@ -360,7 +360,7 @@ class Masq {
     myUrl.searchParams.set('channel', channel)
     myUrl.searchParams.set('challenge', challenge)
     myUrl.searchParams.set('appName', this.appName)
-    myUrl.searchParams.set('profileID', this.profileID)
+    myUrl.searchParams.set('profileID', this.profile)
     return {
       link: myUrl.href,
       channel,
