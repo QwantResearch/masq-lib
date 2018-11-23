@@ -271,11 +271,6 @@ class Masq {
           break
 
         case 'ready':
-          if (json.challenge !== challenge) {
-            // This peer may be malicious, close the connection
-            sw.close()
-            break
-          }
           // Masq must send ready after the authorization
           this._startReplication(this.dbs[this.profile], this.profile)
           sw.close()
