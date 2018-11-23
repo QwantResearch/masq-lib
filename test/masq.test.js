@@ -40,9 +40,8 @@ beforeAll((done) => {
   })
 })
 
-// FIXME afterAll should be async and we should provide done to server.close as callback
-afterAll(() => {
-  server.close()
+afterAll((done) => {
+  server.close(done)
 })
 
 beforeEach(async () => {
