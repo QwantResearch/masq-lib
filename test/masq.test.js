@@ -64,17 +64,6 @@ test('should generate a pairing link', () => {
   expect(url.searchParams.get('challenge')).toBe(challenge)
 })
 
-test('someTest', async (done) => {
-  setTimeout(() => {
-    done()
-  }, 2000)
-  await new Promise((resolve) => {
-    setTimeout(() => {
-      resolve()
-    }, 5000)
-  })
-})
-
 test('should join a channel', async () => {
   expect.assertions(1)
 
