@@ -184,6 +184,7 @@ class Masq {
           if (json.challenge !== challenge) {
             // This peer may be malicious, close the connection
             sw.close()
+            this._requestMasqAccessErr = Error('Challenge does not match')
           } else {
             // db creation
             debug(`Creation of hyperdb masq-profiles with the received key ${json.key.slice(0, 5)}`)
@@ -220,8 +221,21 @@ class Masq {
 
   requestMasqAccessDone () {
     return new Promise((resolve, reject) => {
-      if (this._requestMasqAccessDone) return resolve()
-      this._onRequestMasqAccessDone = resolve
+      if (this._requestMasqAccessDone) {
+        if (this._requestMasqAccessErr) {
+          reject(this._requestMasqAccessErr)
+        } else {
+          resolve()
+        }
+      }
+      this._onRequestMasqAccessDone = () => {
+        this._onRequestMasqAccessDone = undefined
+        if (this._requestMasqAccessErr) {
+          reject(this._requestMasqAccessErr)
+        } else {
+          resolve()
+        }
+      }
     })
   }
 
