@@ -264,14 +264,16 @@ class Masq {
     const handleData = async (sw, peer, data) => {
       const json = JSON.parse(data)
 
+      // Check if challenge matches
+      if (json.challenge !== challenge) {
+        // This peer may be malicious, close the connection
+        this._exchangeDataErr = Error('Challenge does not match')
+        sw.close()
+        return
+      }
+
       switch (json.msg) {
         case 'sendDataKey':
-          if (json.challenge !== challenge) {
-            // This peer may be malicious, close the connection
-            sw.close()
-            break
-          }
-
           // db creation and replication
           const db = hyperdb(rai(this.profile), Buffer.from(json.key, 'hex'), { valueEncoding: 'json' })
           await promiseHyperdb.ready(db)
@@ -307,8 +309,21 @@ class Masq {
 
   exchangeDataHyperdbKeysDone () {
     return new Promise((resolve, reject) => {
-      if (this._exchangeDataDone) return resolve()
-      this._onExchangeDone = resolve
+      if (this._exchangeDataDone) {
+        if (this._exchangeDataErr) {
+          reject(this._exchangeDataErr)
+        } else {
+          return resolve()
+        }
+      }
+      this._onExchangeDone = () => {
+        this._onExchangeDone = undefined
+        if (this._exchangeDataErr) {
+          reject(this._exchangeDataErr)
+        } else {
+          return resolve()
+        }
+      }
     })
   }
 
