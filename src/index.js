@@ -183,34 +183,36 @@ class Masq {
           // check challenges
           if (json.challenge !== challenge) {
             // This peer may be malicious, close the connection
-            sw.close()
             this._requestMasqAccessErr = Error('Challenge does not match')
-          } else {
-            // db creation
-            debug(`Creation of hyperdb masq-profiles with the received key ${json.key.slice(0, 5)}`)
-            const db = hyperdb(rai('masq-profiles'), Buffer.from(json.key, 'hex'), { valueEncoding: 'json' })
-            await promiseHyperdb.ready(db)
-
-            // Store
-            this.dbs.profiles = db
-
-            peer.send(JSON.stringify({
-              msg: 'replicationProfilesStarted'
-            }))
-            // db replication
-            this._startReplication(this.dbs.profiles, 'profiles')
             sw.close()
+            break
           }
+          // db creation
+          debug(`Creation of hyperdb masq-profiles with the received key ${json.key.slice(0, 5)}`)
+          const db = hyperdb(rai('masq-profiles'), Buffer.from(json.key, 'hex'), { valueEncoding: 'json' })
+          await promiseHyperdb.ready(db)
+
+          // Store
+          this.dbs.profiles = db
+
+          peer.send(JSON.stringify({
+            msg: 'replicationProfilesStarted'
+          }))
+          // db replication
+          this._startReplication(this.dbs.profiles, 'profiles')
+          sw.close()
           break
         default:
           break
       }
     }
 
-    this._initSwarmWithDataHandler(channel, handleData).then(() => {
-      this._requestMasqAccessDone = true
-      if (this._onRequestMasqAccessDone) this._onRequestMasqAccessDone()
-    })
+    this._initSwarmWithDataHandler(channel, handleData).then(
+      () => {
+        this._requestMasqAccessDone = true
+        if (this._onRequestMasqAccessDone) this._onRequestMasqAccessDone()
+      }
+    )
 
     return {
       channel,
