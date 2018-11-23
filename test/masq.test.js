@@ -304,6 +304,15 @@ test('del should reject when there is no profile selected', async () => {
   }
 })
 
+test('watch should reject when there is no profile selected', async () => {
+  expect.assertions(1)
+  try {
+    masq.watch('key', () => {})
+  } catch (e) {
+    expect(e.message).toBe('No profile selected')
+  }
+})
+
 function _initTestDBForProfile () {
   masq.setProfile(profile.id)
   // Only for test purpose, we overwrite the data hyperdb
@@ -348,4 +357,17 @@ test('should get one profile', async () => {
   let profiles = await masq.getProfiles()
   expect(profiles).toHaveLength(1)
   expect(profiles[0]).toEqual(profile)
+})
+
+test('should set a watcher', async (done) => {
+  expect.assertions(1)
+  const onChange = () => {
+    expect(true).toBe(true)
+    done()
+  }
+  _initTestDBForProfile()
+  const key = '/hello'
+  const value = { data: 'world' }
+  masq.watch('/hello', onChange)
+  await masq.put(key, value)
 })

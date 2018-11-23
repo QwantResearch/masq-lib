@@ -90,6 +90,16 @@ class Masq {
   }
 
   /**
+   * Set a watcher
+   * @param {string} key - Key
+   * @returns {Object}
+   */
+  watch (key, cb) {
+    let db = this._getDB()
+    return db.watch(key, () => cb())
+  }
+
+  /**
    * Get a value
    * @param {string} key - Key
    * @returns {Promise}
