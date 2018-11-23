@@ -7,6 +7,7 @@ const hyperdb = require('hyperdb')
 
 const Masq = require('../src')
 const promiseHyperdb = require('../src/promiseHyperdb')
+const MasqAppMock = require('./mockMasqApp')
 
 const HUB_URL = 'localhost:8080'
 const APP_NAME = 'app1'
@@ -100,181 +101,68 @@ test('should join a channel', async () => {
 test('should be kicked if challenge does not match', async () => {
   expect.assertions(2)
 
-  const pr = new Promise((resolve, reject) => {
-    const { channel } = masq.requestMasqAccess()
+  const masqAppMock = new MasqAppMock(HUB_URL)
 
-    // simulating masq app
-    const hub = signalhub(channel, [HUB_URL])
-    const sw = swarm(hub, { wrtc })
-    sw.on('peer', (peer, id) => {
-      expect(sw.peers).toHaveLength(1)
-      peer.send(JSON.stringify({
-        msg: 'sendProfilesKey',
-        challenge: 'challengemismatch'
-      }))
-    })
-
-    sw.on('disconnect', (peer, id) => {
-      expect(peer).toBeDefined()
-      sw.close()
-    })
-
-    sw.on('close', () => {
-      resolve()
-    })
-  })
-
-  await pr
-  await masq.requestMasqAccessDone()
+  const { channel } = masq.requestMasqAccess()
+  const wrongChallenge = 'wrongChallenge'
+  // no await as this promise will never resolve because of wrong challenge
+  masqAppMock.handleAccessRequest(channel, wrongChallenge)
+  try {
+    await masq.requestMasqAccessDone()
+  } catch (err) {
+    expect(err).toBeDefined()
+    expect(err.message).toBe('Challenge does not match')
+  }
+  await masqAppMock.destroy()
 })
 
 test('should receive message replicationProfilesStarted', async () => {
-  expect.assertions(1)
+  const masqAppMock = new MasqAppMock(HUB_URL)
 
-  const pr = new Promise((resolve, reject) => {
-    const { channel, challenge } = masq.requestMasqAccess()
-    const key = 'c4b60362325d27ad3c04db158fa68fe6fde00387467708ab3a0be79c811b3825'
-
-    // simulating masq app
-    const hub = signalhub(channel, [HUB_URL])
-    const sw = swarm(hub, { wrtc })
-
-    sw.on('peer', (peer, id) => {
-      peer.on('data', data => {
-        const json = JSON.parse(data)
-        expect(json.msg).toBe('replicationProfilesStarted')
-        sw.close()
-      })
-
-      peer.send(JSON.stringify({
-        msg: 'sendProfilesKey',
-        challenge: challenge,
-        key: key
-      }))
-    })
-
-    sw.on('close', () => {
-      resolve()
-    })
-
-    sw.on('disconnect', (peer, id) => {
-      sw.close()
-    })
-  })
-
-  await pr
+  const { channel, challenge } = masq.requestMasqAccess()
+  await masqAppMock.handleAccessRequest(channel, challenge)
   await masq.requestMasqAccessDone()
+  await masqAppMock.destroy()
 })
 
-async function _initProfilesReplication () {
-  const pr = new Promise((resolve, reject) => {
-    const { channel, challenge } = masq.requestMasqAccess()
-    const key = 'c4b60362325d27ad3c04db158fa68fe6fde00387467708ab3a0be79c811b3825'
-
-    // simulating masq app
-    const hub = signalhub(channel, [HUB_URL])
-    const sw = swarm(hub, { wrtc })
-    sw.on('peer', (peer, id) => {
-      peer.on('data', data => {
-        const json = JSON.parse(data)
-        if (json.msg === 'replicationProfilesStarted') {
-          sw.close()
-        }
-      })
-
-      peer.send(JSON.stringify({
-        msg: 'sendProfilesKey',
-        challenge: challenge,
-        key: key
-      }))
-    })
-
-    sw.on('close', () => {
-      resolve()
-    })
-
-    sw.on('error', err => {
-      reject(err)
-    })
-  })
-  await pr
-  await masq.requestMasqAccessDone()
-}
-
 test('should fail to start key exchange when there is no profile selected', async () => {
+  const masqAppMock = new MasqAppMock(HUB_URL)
+
+  const { channel, challenge } = masq.requestMasqAccess()
+  await masqAppMock.handleAccessRequest(channel, challenge)
+  await masq.requestMasqAccessDone()
   expect.assertions(1)
-  await _initProfilesReplication()
   try {
     masq.exchangeDataHyperdbKeys('app')
   } catch (e) {
     await masq.exchangeDataHyperdbKeysDone()
     expect(e.message).toBe('No profile selected')
   }
+  await masqAppMock.destroy()
 })
 
 test('should exchange key and authorize local key if challenge matches', async () => {
-  await _initProfilesReplication()
-  expect.assertions(4)
+  const masqAppMock = new MasqAppMock(HUB_URL)
+
+  const { channel, challenge } = masq.requestMasqAccess()
+  await masqAppMock.handleAccessRequest(channel, challenge)
+  await masq.requestMasqAccessDone()
+
+  masq.setProfile(profile.id)
+
+  const appInfo = {
+    name: masq.appName,
+    description: 'A wonderful app',
+    image: ' a link to image'
+  }
+
+  const ret = masq.exchangeDataHyperdbKeys(appInfo)
+
   // We check which profile corresponds to the current user
-  const pr = new Promise((resolve, reject) => {
-    masq.setProfile(profile.id)
-
-    const appInfo = {
-      name: masq.appName,
-      description: 'A wonderful app',
-      image: ' a link to image'
-    }
-
-    const { challenge, channel } = masq.exchangeDataHyperdbKeys(appInfo)
-
-    // simulating masq app
-    const hub = signalhub(channel, [HUB_URL])
-    const sw = swarm(hub, { wrtc })
-    sw.on('peer', (peer, id) => {
-      // create hyperdb for the requested service and send the key
-      const key = 'c4b60362325d27ad3c04db158fa68fe6fde00387467708ab3a0be79c811b3825'
-
-      peer.on('data', data => {
-        const json = JSON.parse(data)
-        switch (json.msg) {
-          case 'appInfo':
-            expect(json.name).toBe(appInfo.name)
-            expect(json.description).toBe(appInfo.description)
-            expect(json.image).toBe(appInfo.image)
-            peer.send(JSON.stringify({
-              msg: 'sendDataKey',
-              challenge: challenge,
-              key: key
-            }))
-            break
-          case 'requestWriteAccess':
-            expect(json.key).toHaveLength(64)
-            // authorize local key & start replication
-            peer.send(JSON.stringify({
-              msg: 'ready',
-              challenge: challenge
-            }))
-            sw.close()
-            break
-          default:
-            break
-        }
-      })
-    })
-
-    sw.on('close', () => {
-      resolve()
-    })
-
-    sw.on('disconnect', (peer, id) => {
-      sw.close()
-    })
-
-    sw.on('error', (err) => reject(err))
-  })
-
-  await pr
+  await masqAppMock.handleExchangeHyperdbKeys(ret.channel, ret.challenge, appInfo)
   await masq.exchangeDataHyperdbKeysDone()
+
+  await masqAppMock.destroy()
 })
 
 test('put should reject when there is no profile selected', async () => {
