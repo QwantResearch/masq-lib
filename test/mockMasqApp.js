@@ -2,9 +2,10 @@ const signalhub = require('signalhubws')
 const swarm = require('webrtc-swarm')
 const wrtc = require('wrtc')
 
+const config = require('../config/config')
+
 class MockMasqApp {
-  constructor (hubUrl) {
-    this.hubUrl = hubUrl
+  constructor () {
     this.sws = {}
   }
 
@@ -19,7 +20,7 @@ class MockMasqApp {
 
   handleAccessRequest (channel, challenge) {
     return new Promise((resolve, reject) => {
-      const hub = signalhub(channel, [this.hubUrl])
+      const hub = signalhub(channel, config.HUB_URLS)
       const sw = swarm(hub, { wrtc })
       this.sws[sw.me] = sw
       const key = 'c4b60362325d27ad3c04db158fa68fe6fde00387467708ab3a0be79c811b3825'
@@ -53,7 +54,7 @@ class MockMasqApp {
   handleExchangeHyperdbKeys (channel, challenge, appInfo) {
     return new Promise((resolve, reject) => {
       // simulating masq app
-      const hub = signalhub(channel, [this.hubUrl])
+      const hub = signalhub(channel, config.HUB_URLS)
       const sw = swarm(hub, { wrtc })
       sw.on('peer', (peer, id) => {
         // create hyperdb for the requested service and send the key

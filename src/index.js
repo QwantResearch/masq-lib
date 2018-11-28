@@ -6,9 +6,7 @@ const uuidv4 = require('uuid/v4')
 const pump = require('pump')
 
 const promiseHyperdb = require('./promiseHyperdb')
-
-const HUB_URL = 'localhost:8080'
-const MASQ_APP_BASE_URL = 'http://localhost:3000'
+const config = require('../config/config')
 
 const debug = (function () {
   switch (process.env.NODE_ENV) {
@@ -136,7 +134,7 @@ class Masq {
     return new Promise((resolve, reject) => {
       // Subscribe to channel for a limited time to sync with masq
       debug(`Creation of a hub with ${channel} channel name`)
-      const hub = signalhub(channel, [HUB_URL])
+      const hub = signalhub(channel, config.HUB_URLS)
       let sw = null
 
       if (swarm.WEBRTC_SUPPORT) {
@@ -332,7 +330,7 @@ class Masq {
   _startReplication (db, name) {
     debug(`Start replication for ${name}`)
     const discoveryKey = db.discoveryKey.toString('hex')
-    const hub = signalhub(discoveryKey, [HUB_URL])
+    const hub = signalhub(discoveryKey, config.HUB_URLS)
     this.hubs[name] = hub
 
     if (swarm.WEBRTC_SUPPORT) {
@@ -378,7 +376,7 @@ class Masq {
   _genGetProfilesLink () {
     const channel = uuidv4()
     const challenge = uuidv4()
-    const myUrl = new URL(MASQ_APP_BASE_URL)
+    const myUrl = new URL(config.MASQ_APP_BASE_URL)
     myUrl.searchParams.set('requestType', 'syncProfiles')
     myUrl.searchParams.set('channel', channel)
     myUrl.searchParams.set('challenge', challenge)
@@ -391,7 +389,7 @@ class Masq {
   _genGetAppDataLink () {
     const channel = uuidv4()
     const challenge = uuidv4()
-    const myUrl = new URL(MASQ_APP_BASE_URL)
+    const myUrl = new URL(config.MASQ_APP_BASE_URL)
     myUrl.searchParams.set('requestType', 'syncAppData')
     myUrl.searchParams.set('channel', channel)
     myUrl.searchParams.set('challenge', challenge)

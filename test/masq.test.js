@@ -8,8 +8,8 @@ const hyperdb = require('hyperdb')
 const Masq = require('../src')
 const promiseHyperdb = require('../src/promiseHyperdb')
 const MasqAppMock = require('./mockMasqApp')
+const config = require('../config/config')
 
-const HUB_URL = 'localhost:8080'
 const APP_NAME = 'app1'
 
 // user an in memory random-access-storage instead
@@ -58,6 +58,9 @@ test('should generate a pairing link', () => {
   const uuidSize = 36
   const { link, channel, challenge } = masq.requestMasqAccess()
   const url = new URL(link)
+  let base = config.MASQ_APP_BASE_URL
+  expect(url.origin + url.pathname).toBe(base)
+  expect(url.searchParams.get('channel')).toHaveLength(uuidSize)
   expect(url.searchParams.get('channel')).toHaveLength(uuidSize)
   expect(url.searchParams.get('channel')).toBe(channel)
   expect(url.searchParams.get('challenge')).toHaveLength(uuidSize)
@@ -71,7 +74,7 @@ test('should join a channel', async () => {
     const { channel } = masq.requestMasqAccess()
 
     // simulating masq app
-    const hub = signalhub(channel, [HUB_URL])
+    const hub = signalhub(channel, config.HUB_URLS)
     const sw = swarm(hub, { wrtc })
 
     sw.on('peer', (peer, id) => {
@@ -90,7 +93,7 @@ test('should join a channel', async () => {
 test('should be kicked if challenge does not match', async () => {
   expect.assertions(2)
 
-  const masqAppMock = new MasqAppMock(HUB_URL)
+  const masqAppMock = new MasqAppMock()
 
   const { channel } = masq.requestMasqAccess()
   const wrongChallenge = 'wrongChallenge'
@@ -106,7 +109,7 @@ test('should be kicked if challenge does not match', async () => {
 })
 
 test('should receive message replicationProfilesStarted', async () => {
-  const masqAppMock = new MasqAppMock(HUB_URL)
+  const masqAppMock = new MasqAppMock()
 
   const { channel, challenge } = masq.requestMasqAccess()
   await masqAppMock.handleAccessRequest(channel, challenge)
@@ -115,7 +118,7 @@ test('should receive message replicationProfilesStarted', async () => {
 })
 
 test('should fail to start key exchange when there is no profile selected', async () => {
-  const masqAppMock = new MasqAppMock(HUB_URL)
+  const masqAppMock = new MasqAppMock()
 
   const { channel, challenge } = masq.requestMasqAccess()
   await masqAppMock.handleAccessRequest(channel, challenge)
@@ -131,7 +134,7 @@ test('should fail to start key exchange when there is no profile selected', asyn
 })
 
 test('should exchange key and authorize local key if challenge matches', async () => {
-  const masqAppMock = new MasqAppMock(HUB_URL)
+  const masqAppMock = new MasqAppMock()
 
   const { channel, challenge } = masq.requestMasqAccess()
   await masqAppMock.handleAccessRequest(channel, challenge)
