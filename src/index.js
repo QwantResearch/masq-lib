@@ -1,11 +1,9 @@
 const swarm = require('webrtc-swarm')
 const signalhub = require('signalhubws')
-const rai = require('random-access-idb')
-const hyperdb = require('hyperdb')
 const uuidv4 = require('uuid/v4')
 const pump = require('pump')
 
-const promiseHyperdb = require('./promiseHyperdb')
+const utils = require('./utils')
 const config = require('../config/config')
 
 const debug = (function () {
@@ -53,7 +51,7 @@ class Masq {
    * @returns {Promise}
    */
   async getProfiles () {
-    const nodes = await promiseHyperdb.get(this.dbs.profiles, '/profiles')
+    const nodes = await this.dbs.profiles.getAsync('/profiles')
     if (!nodes.length) return []
     const ids = nodes[0].value
     debug(`profiles ids, ${JSON.stringify(ids)}`)
@@ -66,7 +64,7 @@ class Masq {
   }
 
   async getProfileByID (id) {
-    const nodes = await promiseHyperdb.get(this.dbs.profiles, `/profiles/${id}`)
+    const nodes = await this.dbs.profiles.getAsync(`/profiles/${id}`)
     if (!nodes || !nodes[0] || !nodes[0].value) return nodes
     return nodes[0].value
   }
@@ -104,7 +102,7 @@ class Masq {
    */
   async get (key) {
     let db = this._getDB()
-    const nodes = await promiseHyperdb.get(db, key)
+    const nodes = await db.getAsync(key)
     if (!nodes.length) return nodes[0]
     return nodes[0].value
   }
@@ -117,7 +115,7 @@ class Masq {
    */
   async put (key, value) {
     let db = this._getDB()
-    return promiseHyperdb.put(db, key, value)
+    return db.putAsync(key, value)
   }
 
   /**
@@ -127,7 +125,7 @@ class Masq {
    */
   async del (key) {
     let db = this._getDB()
-    return promiseHyperdb.put(db, key)
+    return db.delAsync(key)
   }
 
   async _initSwarmWithDataHandler (channel, dataHandler, initialMessage) {
@@ -187,8 +185,8 @@ class Masq {
           }
           // db creation
           debug(`Creation of hyperdb masq-profiles with the received key ${json.key.slice(0, 5)}`)
-          const db = hyperdb(rai('masq-profiles'), Buffer.from(json.key, 'hex'), { valueEncoding: 'json' })
-          await promiseHyperdb.ready(db)
+          const db = utils.createPromisifiedHyperDB('masq-profiles', json.key)
+          await utils.dbReady(db)
 
           // Store
           this.dbs.profiles = db
@@ -275,8 +273,8 @@ class Masq {
       switch (json.msg) {
         case 'sendDataKey':
           // db creation and replication
-          const db = hyperdb(rai(this.profile), Buffer.from(json.key, 'hex'), { valueEncoding: 'json' })
-          await promiseHyperdb.ready(db)
+          const db = utils.createPromisifiedHyperDB(this.profile, json.key)
+          await utils.dbReady(db)
           // Store
           this.dbs[this.profile] = db
 
@@ -352,22 +350,22 @@ class Masq {
 
   /** open and sync existing databases */
   async _openAndSyncDatabases () {
-    if (!(await promiseHyperdb.dbExists('masq-profiles'))) {
+    if (!(await utils.dbExists('masq-profiles'))) {
       return
     }
-    const db = hyperdb(rai('masq-profiles'), { valueEncoding: 'json' })
-    await promiseHyperdb.ready(db)
+    const db = utils.createPromisifiedHyperDB('masq-profiles')
+    await utils.dbReady(db)
     this.dbs.profiles = db
     this._startReplication(db, 'masq-profiles')
     let profiles = await this.getProfiles()
 
     for (let index = 0; index < profiles.length; index++) {
       let id = profiles[index].id
-      if (!(await promiseHyperdb.dbExists(id))) {
+      if (!(await utils.dbExists(id))) {
         continue
       }
-      const db = hyperdb(rai(id), { valueEncoding: 'json' })
-      await promiseHyperdb.ready(db)
+      const db = utils.createPromisifiedHyperDB(id)
+      await utils.dbReady(db)
       this.dbs[id] = db
       this._startReplication(db, id)
     }
