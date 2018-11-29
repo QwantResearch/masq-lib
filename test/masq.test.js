@@ -2,13 +2,11 @@ const signalserver = require('signalhubws/server')
 const signalhub = require('signalhubws')
 const swarm = require('webrtc-swarm')
 const wrtc = require('wrtc')
-const rai = require('random-access-idb')
-const hyperdb = require('hyperdb')
 
 const Masq = require('../src')
-const promiseHyperdb = require('../src/promiseHyperdb')
 const MasqAppMock = require('./mockMasqApp')
 const config = require('../config/config')
+const utils = require('../src/utils')
 
 const APP_NAME = 'app1'
 
@@ -16,8 +14,8 @@ const APP_NAME = 'app1'
 jest.mock('random-access-idb', () =>
   () => require('random-access-memory'))
 
-jest.mock('../src/promiseHyperdb', () => {
-  const original = require.requireActual('../src/promiseHyperdb')
+jest.mock('../src/utils', () => {
+  const original = require.requireActual('../src/utils')
   return {
     ...original,
     dbExists: jest.fn(() => false)
@@ -196,7 +194,7 @@ test('watch should reject when there is no profile selected', async () => {
 function _initTestDBForProfile () {
   masq.setProfile(profile.id)
   // Only for test purpose, we overwrite the data hyperdb
-  dbTest = hyperdb(rai(profile.id), { valueEncoding: 'json' })
+  dbTest = utils.createPromisifiedHyperDB(profile.id)
   masq.dbs[profile.id] = dbTest
 }
 
@@ -218,11 +216,11 @@ test('del should del an item', async () => {
   await masq.put(key, value)
   await masq.del(key)
   const res = await masq.get('/hello')
-  expect(res).toBeNull()
+  expect(res).toBeUndefined()
 })
 
 test('should get empty profiles', async () => {
-  dbTest = hyperdb(rai('masq-profiles'), { valueEncoding: 'json' })
+  dbTest = utils.createPromisifiedHyperDB('masq-profiles')
   masq.dbs.profiles = dbTest
   let profiles = await masq.getProfiles()
   expect(profiles).toEqual([])
@@ -230,10 +228,10 @@ test('should get empty profiles', async () => {
 
 test('should get one profile', async () => {
   const profile = { username: 'someusername' }
-  const dbTest = hyperdb(rai('dbtest'), { valueEncoding: 'json' })
+  dbTest = utils.createPromisifiedHyperDB('dbtest')
   masq.dbs.profiles = dbTest
-  await promiseHyperdb.put(dbTest, '/profiles', ['id'])
-  await promiseHyperdb.put(dbTest, '/profiles/id', profile)
+  await dbTest.putAsync('/profiles', ['id'])
+  await dbTest.putAsync('/profiles/id', profile)
   let profiles = await masq.getProfiles()
   expect(profiles).toHaveLength(1)
   expect(profiles[0]).toEqual(profile)
