@@ -19,6 +19,7 @@
   },
   "homepage": "https://github.com/G-Ray/hypermasq-lib#readme",
   "dependencies": {
+    "bluebird": "^3.5.3",
     "hyperdb": "^3.5.0",
     "random-access-idb": "^1.0.4",
     "signalhubws": "^1.0.6",
