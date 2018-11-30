@@ -3,101 +3,102 @@ const swarm = require('webrtc-swarm')
 const wrtc = require('wrtc')
 
 const config = require('../config/config')
+const utils = require('../src/utils')
 
 class MockMasqApp {
-  constructor () {
-    this.sws = {}
+  handleConnectionAuthorized (channel, challenge) {
+    return this._handleConnection(true, true)(channel, challenge)
   }
 
-  destroy () {
-    const prArr = Object.values(this.sws).map(sw => {
+  handleConnectionNotAuthorized (channel, challenge) {
+    return this._handleConnection(false, true)(channel, challenge)
+  }
+
+  handleConnectionRegisterRefused (channel, challenge) {
+    return this._handleConnection(false, false)(channel, challenge)
+  }
+
+  _handleConnection (authorized, registerAccepted) {
+    return (channel, challenge) => {
       return new Promise((resolve, reject) => {
-        sw.close(resolve)
-      })
-    })
-    return Promise.all(prArr)
-  }
+        const hub = signalhub(channel, config.HUB_URLS)
+        const sw = swarm(hub, { wrtc })
+        const userAppId = 'userAppId'
+        let db
 
-  handleAccessRequest (channel, challenge) {
-    return new Promise((resolve, reject) => {
-      const hub = signalhub(channel, config.HUB_URLS)
-      const sw = swarm(hub, { wrtc })
-      this.sws[sw.me] = sw
-      const key = 'c4b60362325d27ad3c04db158fa68fe6fde00387467708ab3a0be79c811b3825'
+        let registered = false
 
-      sw.on('peer', (peer, id) => {
-        peer.on('data', data => {
-          const json = JSON.parse(data)
-          if (json.msg !== 'replicationProfilesStarted') {
-            reject(Error(`Expected to receive message with type "replicationProfilesStarted", but received "${json.msg}"`))
+        sw.on('peer', (peer, id) => {
+          // Send authorize or not
+          if (authorized) {
+            peer.send(JSON.stringify({
+              msg: 'authorized',
+              challenge: challenge,
+              id: userAppId
+            }))
+          } else {
+            peer.send(JSON.stringify({
+              msg: 'notAuthorized',
+              challenge: challenge
+            }))
           }
-          sw.close()
+
+          peer.on('data', data => {
+            const json = JSON.parse(data)
+            switch (json.msg) {
+              case 'registerUserApp':
+                if (registered) {
+                  reject(Error('Already registered but received message with type "registered"'))
+                }
+                if (registerAccepted) {
+                  db = utils.createPromisifiedHyperDB(userAppId)
+                  utils.dbReady(db).then(() => {
+                    peer.send(JSON.stringify({
+                      msg: 'masqAccessGranted',
+                      challenge: challenge,
+                      id: userAppId,
+                      key: db.discoveryKey.toString('hex')
+                    }))
+                    registered = true
+                  })
+                } else {
+                  peer.send(JSON.stringify({
+                    msg: 'masqAccessRefused',
+                    challenge: challenge
+                  }))
+                  sw.close()
+                }
+                break
+              case 'requestWriteAccess':
+                if (!registered) {
+                  reject(Error('Expected to receive message with type "register", but received "requestWriteAccess"'))
+                }
+
+                db.authorizeAsync(Buffer.from(json.key, 'hex')).then(() => {
+                  peer.send(JSON.stringify({
+                    msg: 'writeAccessGranted',
+                    challenge: challenge
+                  }))
+                  sw.close()
+                })
+
+                break
+              default:
+                reject(Error(`Expected to receive message with type "register" or "requestWriteAccess", but received "${json.msg}"`))
+                sw.close()
+                break
+            }
+          })
         })
 
-        peer.send(JSON.stringify({
-          msg: 'sendProfilesKey',
-          challenge: challenge,
-          key: key
-        }))
-      })
+        sw.on('close', () => {
+          resolve()
+        })
 
-      sw.on('close', () => {
-        delete this.sws[sw.me]
-        resolve()
-      })
-
-      sw.on('disconnect', (peer, id) => {
-      })
-    })
-  }
-
-  handleExchangeHyperdbKeys (channel, challenge, appInfo) {
-    return new Promise((resolve, reject) => {
-      // simulating masq app
-      const hub = signalhub(channel, config.HUB_URLS)
-      const sw = swarm(hub, { wrtc })
-      sw.on('peer', (peer, id) => {
-        // create hyperdb for the requested service and send the key
-        const key = 'c4b60362325d27ad3c04db158fa68fe6fde00387467708ab3a0be79c811b3825'
-
-        peer.on('data', data => {
-          const json = JSON.parse(data)
-          switch (json.msg) {
-            case 'appInfo':
-              if (json.name !== appInfo.name) throw Error('Received wrong app name')
-              if (json.description !== appInfo.description) throw Error('Received wrong app description')
-              if (json.image !== appInfo.image) throw Error('Received wrong app image')
-              peer.send(JSON.stringify({
-                msg: 'sendDataKey',
-                challenge: challenge,
-                key: key
-              }))
-              break
-            case 'requestWriteAccess':
-              if (json.key.length !== 64) throw Error(`Received key with length ${json.key.length} instead of 64`)
-              // authorize local key & start replication
-              peer.send(JSON.stringify({
-                msg: 'ready',
-                challenge: challenge
-              }))
-              sw.close()
-              break
-            default:
-              break
-          }
+        sw.on('disconnect', (peer, id) => {
         })
       })
-
-      sw.on('close', () => {
-        resolve()
-      })
-
-      sw.on('disconnect', (peer, id) => {
-        sw.close()
-      })
-
-      sw.on('error', (err) => reject(err))
-    })
+    }
   }
 }
 
