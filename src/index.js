@@ -20,69 +20,28 @@ class Masq {
    * constructor
    * @param {string} appName - The application name
    */
-  constructor (appName) {
-    this.profile = null
-    this.sws = {}
-    this.hubs = {}
-    this.appName = appName
-    this.dbs = {
-      profiles: null // masq public profiles
-    }
-  }
+  constructor (appName, appDescription, appImageURL) {
+    this.userAppDb = null
+    this.userAppRepSW = null
+    this.userAppRepHub = null
 
-  /**
-   * @returns {Promise}
-   */
-  init () {
-    return this._openAndSyncDatabases()
+    this.appName = appName
+    this.appDescription = appDescription
+    this.appImageURL = appImageURL
   }
 
   destroy () {
-    const prArr = Object.values(this.sws).map(sw => {
-      return new Promise((resolve, reject) => {
-        sw.close(resolve)
-      })
+    return new Promise((resolve) => {
+      if (!this.userAppRepSW) {
+        resolve()
+      }
+      this.userAppRepSW.close(resolve)
     })
-    return Promise.all(prArr)
-  }
-
-  /**
-   * Get all profiles registered in masq
-   * @returns {Promise}
-   */
-  async getProfiles () {
-    const nodes = await this.dbs.profiles.getAsync('/profiles')
-    if (!nodes.length) return []
-    const ids = nodes[0].value
-    debug(`profiles ids, ${JSON.stringify(ids)}`)
-
-    let promiseArr = []
-    for (let id of ids) {
-      promiseArr.push(this.getProfileByID(id))
-    }
-    return Promise.all(promiseArr)
-  }
-
-  async getProfileByID (id) {
-    const nodes = await this.dbs.profiles.getAsync(`/profiles/${id}`)
-    if (!nodes || !nodes[0] || !nodes[0].value) return nodes
-    return nodes[0].value
-  }
-
-  /**
-   * Set the current profile
-   * @param {string} id - The profile id
-   */
-  setProfile (id) {
-    // check id
-    this.profile = id
   }
 
   _getDB () {
-    if (!this.profile) throw Error('No profile selected')
-    let db = this.dbs[this.profile]
-    if (!db) throw Error('db does not exist for selected profile')
-    return db
+    if (!this.userAppDb) throw Error('Not connected to Masq')
+    return this.userAppDb
   }
 
   /**
@@ -157,6 +116,36 @@ class Masq {
     })
   }
 
+  _genGetProfilesLink () {
+    const channel = uuidv4()
+    const challenge = uuidv4()
+    const myUrl = new URL(config.MASQ_APP_BASE_URL)
+    myUrl.searchParams.set('requestType', 'login')
+    myUrl.searchParams.set('channel', channel)
+    myUrl.searchParams.set('challenge', challenge)
+    return {
+      link: myUrl.href,
+      channel,
+      challenge
+    }
+  }
+
+  _startReplication (db) {
+    const discoveryKey = db.discoveryKey.toString('hex')
+    this.userAppRepHub = signalhub(discoveryKey, config.HUB_URLS)
+
+    if (swarm.WEBRTC_SUPPORT) {
+      this.userAppRepSW = swarm(this.userAppRepHub)
+    } else {
+      this.userAppRepSW = swarm(this.userAppRepHub, { wrtc: require('wrtc') })
+    }
+
+    this.userAppRepSW.on('peer', async (peer, id) => {
+      const stream = db.replicate({ live: true })
+      pump(peer, stream, peer)
+    })
+  }
+
   /**
    * If this is the first time, this.dbs.profiles is empty.
    * We need to get masq-profiles hyperdb key of masq.
@@ -165,39 +154,115 @@ class Masq {
    *  challenge
    *  channel
    */
-  requestMasqAccess () {
+  connectToMasq () {
     // generation of link with new channel and challenge for the sync of new peer
     const { link, channel, challenge } = this._genGetProfilesLink()
-
-    // TODO generate a QR code with the link
+    let registering = false
+    let waitingForWriteAccess = false
 
     const handleData = async (sw, peer, data) => {
       const json = JSON.parse(data)
+      // check challenges
+      if (json.challenge !== challenge) {
+        // This peer may be malicious, close the connection
+        this._connectToMasqErr = Error('Challenge does not match')
+        sw.close()
+        return
+      }
 
       switch (json.msg) {
-        case 'sendProfilesKey':
-          // check challenges
-          if (json.challenge !== challenge) {
-            // This peer may be malicious, close the connection
-            this._requestMasqAccessErr = Error('Challenge does not match')
+        case 'authorized':
+          if (!json.id) {
+            this._connectToMasqErr = Error('Database Id not found in \'authorized\' message')
             sw.close()
-            break
+            return
           }
-          // db creation
-          debug(`Creation of hyperdb masq-profiles with the received key ${json.key.slice(0, 5)}`)
-          const db = utils.createPromisifiedHyperDB('masq-profiles', json.key)
-          await utils.dbReady(db)
 
-          // Store
-          this.dbs.profiles = db
+          const dbId = json.id
+          if (utils.dbExists(dbId)) {
+            const db = utils.createPromisifiedHyperDB(dbId)
+            await utils.dbReady(db)
+            this.userAppDb = db
 
+            debug(`Start replication for db with id ${json.id}`)
+            this._startReplication(db)
+            return
+            // done with the connection to Masq
+          }
+          registering = true
           peer.send(JSON.stringify({
-            msg: 'replicationProfilesStarted'
+            msg: 'registerUserApp',
+            name: this.appName,
+            description: this.appDescription,
+            imageURL: this.appImageURL
           }))
-          // db replication
-          this._startReplication(this.dbs.profiles, 'profiles')
+
+          break
+
+        case 'notAuthorized':
+          registering = true
+          peer.send(JSON.stringify({
+            msg: 'registerUserApp',
+            name: this.appName,
+            description: this.appDescription,
+            imageURL: this.appImageURL
+          }))
+          break
+
+        case 'masqAccessGranted':
+          if (!registering) {
+            this._connectToMasqErr = Error('Unexpectedly received dbKey while not registering')
+            sw.close()
+            return
+          }
+          registering = false
+
+          if (!json.key) {
+            this._connectToMasqErr = Error('Database key not found in \'dbKey\' message')
+            sw.close()
+            return
+          }
+
+          if (!json.id) {
+            this._connectToMasqErr = Error('Database id not found in \'dbKey\' message')
+            sw.close()
+            return
+          }
+
+          const db = utils.createPromisifiedHyperDB(json.id, json.key)
+          await utils.dbReady(db)
+          this.userAppDb = db
+
+          this._startReplication(db)
+
+          waitingForWriteAccess = true
+          peer.send(JSON.stringify({
+            msg: 'requestWriteAccess',
+            key: db.local.key.toString('hex')
+          }))
+          break
+
+        case 'masqAccessRefused':
+          if (!registering) {
+            this._connectToMasqErr = Error('Unexpectedly received dbKey while not registering')
+            sw.close()
+            return
+          }
+          this._connectToMasqErr = Error('Masq access refused by the user')
+          sw.close()
+          return
+
+        case 'writeAccessGranted':
+          if (!waitingForWriteAccess) {
+            this._connectToMasqErr = Error('Unexpectedly received writeAccessGranted while not registering')
+            sw.close()
+            return
+          }
+          waitingForWriteAccess = false
+
           sw.close()
           break
+
         default:
           break
       }
@@ -205,8 +270,8 @@ class Masq {
 
     this._initSwarmWithDataHandler(channel, handleData).then(
       () => {
-        this._requestMasqAccessDone = true
-        if (this._onRequestMasqAccessDone) this._onRequestMasqAccessDone()
+        this._connectToMasqDone = true
+        if (this._onConnectToMasqDone) this._onConnectToMasqDone()
       }
     )
 
@@ -217,187 +282,26 @@ class Masq {
     }
   }
 
-  requestMasqAccessDone () {
+  connectToMasqDone () {
     return new Promise((resolve, reject) => {
-      if (this._requestMasqAccessDone) {
-        if (this._requestMasqAccessErr) {
-          reject(this._requestMasqAccessErr)
-        } else {
-          resolve()
-        }
-      }
-      this._onRequestMasqAccessDone = () => {
-        this._onRequestMasqAccessDone = undefined
-        if (this._requestMasqAccessErr) {
-          reject(this._requestMasqAccessErr)
-        } else {
-          resolve()
-        }
-      }
-    })
-  }
-
-  /**
-   * After the masq-profiles replication, the right profile is chosen,
-   * the next steps are :
-   * - sending the appInfo
-   * - getting the hyperdb key from masq
-   * - request write authorization by sending the local key
-   * @param {Object} appInfo - The application info : name, description and image
-   */
-  exchangeDataHyperdbKeys (appInfo) {
-    this._exchangeDataDone = false
-    if (!this.profile) {
-      this._exchangeDataDone = true
-      throw (Error('No profile selected'))
-    }
-
-    // generation of link with new channel and challenge for the exchange of keys
-    const { link, channel, challenge } = this._genGetAppDataLink()
-
-    const appInfoMessage = JSON.stringify({
-      ...appInfo, msg: 'appInfo'
-    })
-
-    const handleData = async (sw, peer, data) => {
-      const json = JSON.parse(data)
-
-      // Check if challenge matches
-      if (json.challenge !== challenge) {
-        // This peer may be malicious, close the connection
-        this._exchangeDataErr = Error('Challenge does not match')
-        sw.close()
-        return
-      }
-
-      switch (json.msg) {
-        case 'sendDataKey':
-          // db creation and replication
-          const db = utils.createPromisifiedHyperDB(this.profile, json.key)
-          await utils.dbReady(db)
-          // Store
-          this.dbs[this.profile] = db
-
-          peer.send(JSON.stringify({
-            msg: 'requestWriteAccess',
-            key: db.local.key.toString('hex')
-          }))
-          break
-
-        case 'ready':
-          // Masq must send ready after the authorization
-          this._startReplication(this.dbs[this.profile], this.profile)
-          sw.close()
-          break
-        default:
-          break
-      }
-    }
-    this._initSwarmWithDataHandler(channel, handleData, appInfoMessage).then(() => {
-      this._exchangeDataDone = true
-      if (this._onExchangeDone) this._onExchangeDone()
-    })
-
-    return {
-      channel,
-      challenge,
-      link
-    }
-  }
-
-  exchangeDataHyperdbKeysDone () {
-    return new Promise((resolve, reject) => {
-      if (this._exchangeDataDone) {
-        if (this._exchangeDataErr) {
-          reject(this._exchangeDataErr)
+      if (this._connectToMasqDone) {
+        this._connectToMasqDone = false
+        if (this._connectToMasqErr) {
+          return reject(this._connectToMasqErr)
         } else {
           return resolve()
         }
       }
-      this._onExchangeDone = () => {
-        this._onExchangeDone = undefined
-        if (this._exchangeDataErr) {
-          reject(this._exchangeDataErr)
+      this._onConnectToMasqDone = () => {
+        this._onConnectToMasqDone = undefined
+        this._connectToMasqDone = false
+        if (this._connectToMasqErr) {
+          return reject(this._connectToMasqErr)
         } else {
           return resolve()
         }
       }
     })
-  }
-
-  _startReplication (db, name) {
-    debug(`Start replication for ${name}`)
-    const discoveryKey = db.discoveryKey.toString('hex')
-    const hub = signalhub(discoveryKey, config.HUB_URLS)
-    this.hubs[name] = hub
-
-    if (swarm.WEBRTC_SUPPORT) {
-      this.sws[name] = swarm(hub)
-    } else {
-      this.sws[name] = swarm(hub, { wrtc: require('wrtc') })
-    }
-    const sw = this.sws[name]
-
-    sw.on('peer', async (peer, id) => {
-      const stream = db.replicate({ live: true })
-      pump(peer, stream, peer)
-    })
-  }
-
-  /** open and sync existing databases */
-  _openAndSyncDatabase () {
-  }
-
-  /** open and sync existing databases */
-  async _openAndSyncDatabases () {
-    if (!(await utils.dbExists('masq-profiles'))) {
-      return
-    }
-    const db = utils.createPromisifiedHyperDB('masq-profiles')
-    await utils.dbReady(db)
-    this.dbs.profiles = db
-    this._startReplication(db, 'masq-profiles')
-    let profiles = await this.getProfiles()
-
-    for (let index = 0; index < profiles.length; index++) {
-      let id = profiles[index].id
-      if (!(await utils.dbExists(id))) {
-        continue
-      }
-      const db = utils.createPromisifiedHyperDB(id)
-      await utils.dbReady(db)
-      this.dbs[id] = db
-      this._startReplication(db, id)
-    }
-  }
-
-  _genGetProfilesLink () {
-    const channel = uuidv4()
-    const challenge = uuidv4()
-    const myUrl = new URL(config.MASQ_APP_BASE_URL)
-    myUrl.searchParams.set('requestType', 'syncProfiles')
-    myUrl.searchParams.set('channel', channel)
-    myUrl.searchParams.set('challenge', challenge)
-    return {
-      link: myUrl.href,
-      channel,
-      challenge
-    }
-  }
-  _genGetAppDataLink () {
-    const channel = uuidv4()
-    const challenge = uuidv4()
-    const myUrl = new URL(config.MASQ_APP_BASE_URL)
-    myUrl.searchParams.set('requestType', 'syncAppData')
-    myUrl.searchParams.set('channel', channel)
-    myUrl.searchParams.set('challenge', challenge)
-    myUrl.searchParams.set('appName', this.appName)
-    myUrl.searchParams.set('profileID', this.profile)
-    return {
-      link: myUrl.href,
-      channel,
-      challenge
-    }
   }
 }
 
