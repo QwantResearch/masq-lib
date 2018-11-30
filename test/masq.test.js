@@ -6,9 +6,10 @@ const wrtc = require('wrtc')
 const Masq = require('../src')
 const MasqAppMock = require('./mockMasqApp')
 const config = require('../config/config')
-const utils = require('../src/utils')
 
 const APP_NAME = 'app1'
+const APP_DESCRIPTION = 'A wonderful app'
+const APP_IMAGE_URL = ' a link to image'
 
 // user an in memory random-access-storage instead
 jest.mock('random-access-idb', () =>
@@ -24,10 +25,6 @@ jest.mock('../src/utils', () => {
 
 let server = null
 let masq = null
-let dbTest = null
-let profile = {
-  id: '123-4566-8789'
-}
 
 jest.setTimeout(30000)
 
@@ -43,9 +40,8 @@ afterAll((done) => {
   server.close(done)
 })
 
-beforeEach(async () => {
-  masq = new Masq(APP_NAME)
-  await masq.init()
+beforeEach(() => {
+  masq = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL)
 })
 
 afterEach(async () => {
@@ -54,7 +50,7 @@ afterEach(async () => {
 
 test('should generate a pairing link', () => {
   const uuidSize = 36
-  const { link, channel, challenge } = masq.requestMasqAccess()
+  const { link, channel, challenge } = masq.connectToMasq()
   const url = new URL(link)
   let base = config.MASQ_APP_BASE_URL
   expect(url.origin + url.pathname).toBe(base)
@@ -69,7 +65,7 @@ test('should join a channel', async () => {
   expect.assertions(1)
 
   const pr = new Promise((resolve, reject) => {
-    const { channel } = masq.requestMasqAccess()
+    const { channel } = masq.connectToMasq()
 
     // simulating masq app
     const hub = signalhub(channel, config.HUB_URLS)
@@ -85,7 +81,7 @@ test('should join a channel', async () => {
     })
   })
   await pr
-  await masq.requestMasqAccessDone()
+  await masq.connectToMasqDone()
 })
 
 test('should be kicked if challenge does not match', async () => {
@@ -93,114 +89,51 @@ test('should be kicked if challenge does not match', async () => {
 
   const masqAppMock = new MasqAppMock()
 
-  const { channel } = masq.requestMasqAccess()
+  const { channel } = masq.connectToMasq()
   const wrongChallenge = 'wrongChallenge'
   // no await as this promise will never resolve because of wrong challenge
-  masqAppMock.handleAccessRequest(channel, wrongChallenge)
   try {
-    await masq.requestMasqAccessDone()
+    masqAppMock.handleConnectionAuthorized(channel, wrongChallenge)
+    await masq.connectToMasqDone()
   } catch (err) {
     expect(err).toBeDefined()
     expect(err.message).toBe('Challenge does not match')
   }
-  await masqAppMock.destroy()
 })
 
-test('should receive message replicationProfilesStarted', async () => {
+test('should connect to Masq', async () => {
   const masqAppMock = new MasqAppMock()
 
-  const { channel, challenge } = masq.requestMasqAccess()
-  await masqAppMock.handleAccessRequest(channel, challenge)
-  await masq.requestMasqAccessDone()
-  await masqAppMock.destroy()
+  const { channel, challenge } = masq.connectToMasq()
+  await masqAppMock.handleConnectionAuthorized(channel, challenge)
+  await masq.connectToMasqDone()
 })
 
-test('should fail to start key exchange when there is no profile selected', async () => {
+test('should fail when register is refused', async () => {
   const masqAppMock = new MasqAppMock()
 
-  const { channel, challenge } = masq.requestMasqAccess()
-  await masqAppMock.handleAccessRequest(channel, challenge)
-  await masq.requestMasqAccessDone()
+  const { channel, challenge } = masq.connectToMasq()
+  await masqAppMock.handleConnectionRegisterRefused(channel, challenge)
   expect.assertions(1)
   try {
-    masq.exchangeDataHyperdbKeys('app')
+    await masq.connectToMasqDone()
   } catch (e) {
-    await masq.exchangeDataHyperdbKeysDone()
-    expect(e.message).toBe('No profile selected')
+    expect(e.message).toBe('Masq access refused by the user')
   }
-  await masqAppMock.destroy()
 })
 
-test('should exchange key and authorize local key if challenge matches', async () => {
+// TODO tests for unexpected message received
+
+async function _initMasqDB () {
   const masqAppMock = new MasqAppMock()
-
-  const { channel, challenge } = masq.requestMasqAccess()
-  await masqAppMock.handleAccessRequest(channel, challenge)
-  await masq.requestMasqAccessDone()
-
-  masq.setProfile(profile.id)
-
-  const appInfo = {
-    name: masq.appName,
-    description: 'A wonderful app',
-    image: ' a link to image'
-  }
-
-  const ret = masq.exchangeDataHyperdbKeys(appInfo)
-
-  // We check which profile corresponds to the current user
-  await masqAppMock.handleExchangeHyperdbKeys(ret.channel, ret.challenge, appInfo)
-  await masq.exchangeDataHyperdbKeysDone()
-
-  await masqAppMock.destroy()
-})
-
-test('put should reject when there is no profile selected', async () => {
-  expect.assertions(1)
-  try {
-    await masq.put('key', 'value')
-  } catch (e) {
-    expect(e.message).toBe('No profile selected')
-  }
-})
-
-test('get should reject when there is no profile selected', async () => {
-  expect.assertions(1)
-  try {
-    await masq.get('key')
-  } catch (e) {
-    expect(e.message).toBe('No profile selected')
-  }
-})
-
-test('del should reject when there is no profile selected', async () => {
-  expect.assertions(1)
-  try {
-    await masq.del('key')
-  } catch (e) {
-    expect(e.message).toBe('No profile selected')
-  }
-})
-
-test('watch should reject when there is no profile selected', async () => {
-  expect.assertions(1)
-  try {
-    masq.watch('key', () => {})
-  } catch (e) {
-    expect(e.message).toBe('No profile selected')
-  }
-})
-
-function _initTestDBForProfile () {
-  masq.setProfile(profile.id)
-  // Only for test purpose, we overwrite the data hyperdb
-  dbTest = utils.createPromisifiedHyperDB(profile.id)
-  masq.dbs[profile.id] = dbTest
+  const { channel, challenge } = masq.connectToMasq()
+  await masqAppMock.handleConnectionAuthorized(channel, challenge)
+  await masq.connectToMasqDone()
 }
 
 test('put/get should put and get an item', async () => {
   expect.assertions(1)
-  _initTestDBForProfile()
+  await _initMasqDB()
   const key = '/hello'
   const value = { data: 'world' }
   await masq.put(key, value)
@@ -210,7 +143,7 @@ test('put/get should put and get an item', async () => {
 
 test('del should del an item', async () => {
   expect.assertions(1)
-  _initTestDBForProfile()
+  await _initMasqDB()
   const key = '/hello'
   const value = { data: 'world' }
   await masq.put(key, value)
@@ -219,31 +152,13 @@ test('del should del an item', async () => {
   expect(res).toBeUndefined()
 })
 
-test('should get empty profiles', async () => {
-  dbTest = utils.createPromisifiedHyperDB('masq-profiles')
-  masq.dbs.profiles = dbTest
-  let profiles = await masq.getProfiles()
-  expect(profiles).toEqual([])
-})
-
-test('should get one profile', async () => {
-  const profile = { username: 'someusername' }
-  dbTest = utils.createPromisifiedHyperDB('dbtest')
-  masq.dbs.profiles = dbTest
-  await dbTest.putAsync('/profiles', ['id'])
-  await dbTest.putAsync('/profiles/id', profile)
-  let profiles = await masq.getProfiles()
-  expect(profiles).toHaveLength(1)
-  expect(profiles[0]).toEqual(profile)
-})
-
 test('should set a watcher', async (done) => {
   expect.assertions(1)
   const onChange = () => {
     expect(true).toBe(true)
     done()
   }
-  _initTestDBForProfile()
+  await _initMasqDB()
   const key = '/hello'
   const value = { data: 'world' }
   masq.watch('/hello', onChange)
