@@ -6,12 +6,12 @@ const config = require('../config/config')
 const utils = require('../src/utils')
 
 class MockMasqApp {
-  handleConnectionAuthorized (channel, challenge) {
-    return this._handleConnection(true, true)(channel, challenge)
+  handleConnectionAuthorized (channel, key) {
+    return this._handleConnection(true, true)(channel, key)
   }
 
-  handleConnectionNotAuthorized (channel, challenge) {
-    return this._handleConnection(false, true)(channel, challenge)
+  handleConnectionNotAuthorized (channel, key) {
+    return this._handleConnection(false, true)(channel, key)
   }
 
   handleConnectionRegisterRefused (channel, challenge) {
@@ -19,32 +19,43 @@ class MockMasqApp {
   }
 
   _handleConnection (authorized, registerAccepted) {
-    return (channel, challenge) => {
-      return new Promise((resolve, reject) => {
+    return (channel, rawKey) => {
+      return new Promise(async (resolve, reject) => {
         const hub = signalhub(channel, config.HUB_URLS)
         const sw = swarm(hub, { wrtc })
         const userAppId = 'userAppId'
         let db
 
+        let key
+        try {
+          key = await window.crypto.subtle.importKey(
+            'raw',
+            rawKey,
+            { name: 'AES-GCM' },
+            false,
+            ['encrypt', 'decrypt']
+          )
+        } catch (err) {
+          return reject(Error('Invalid Key'))
+        }
+
         let registered = false
 
-        sw.on('peer', (peer, id) => {
+        sw.on('peer', async (peer, id) => {
           // Send authorize or not
           if (authorized) {
-            peer.send(JSON.stringify({
+            peer.send(await utils.encryptMessage(key, {
               msg: 'authorized',
-              challenge: challenge,
               id: userAppId
             }))
           } else {
-            peer.send(JSON.stringify({
-              msg: 'notAuthorized',
-              challenge: challenge
+            peer.send(await utils.encryptMessage(key, {
+              msg: 'notAuthorized'
             }))
           }
 
-          peer.on('data', data => {
-            const json = JSON.parse(data)
+          peer.on('data', async data => {
+            const json = await utils.decryptMessage(key, data)
             switch (json.msg) {
               case 'registerUserApp':
                 if (registered) {
@@ -52,19 +63,17 @@ class MockMasqApp {
                 }
                 if (registerAccepted) {
                   db = utils.createPromisifiedHyperDB(userAppId)
-                  utils.dbReady(db).then(() => {
-                    peer.send(JSON.stringify({
+                  utils.dbReady(db).then(async () => {
+                    peer.send(await utils.encryptMessage(key, {
                       msg: 'masqAccessGranted',
-                      challenge: challenge,
                       id: userAppId,
                       key: db.discoveryKey.toString('hex')
                     }))
                     registered = true
                   })
                 } else {
-                  peer.send(JSON.stringify({
-                    msg: 'masqAccessRefused',
-                    challenge: challenge
+                  peer.send(await utils.encryptMessage(key, {
+                    msg: 'masqAccessRefused'
                   }))
                   sw.close()
                 }
@@ -74,10 +83,9 @@ class MockMasqApp {
                   reject(Error('Expected to receive message with type "register", but received "requestWriteAccess"'))
                 }
 
-                db.authorizeAsync(Buffer.from(json.key, 'hex')).then(() => {
-                  peer.send(JSON.stringify({
-                    msg: 'writeAccessGranted',
-                    challenge: challenge
+                db.authorizeAsync(Buffer.from(json.key, 'hex')).then(async () => {
+                  peer.send(await utils.encryptMessage(key, {
+                    msg: 'writeAccessGranted'
                   }))
                   sw.close()
                 })

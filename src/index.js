@@ -87,7 +87,7 @@ class Masq {
     return db.delAsync(key)
   }
 
-  async _initSwarmWithDataHandler (channel, dataHandler, initialMessage) {
+  async _initSwarmWithDataHandler (channel, dataHandler) {
     return new Promise((resolve, reject) => {
       // Subscribe to channel for a limited time to sync with masq
       debug(`Creation of a hub with ${channel} channel name`)
@@ -102,7 +102,6 @@ class Masq {
 
       sw.on('peer', (peer, id) => {
         debug(`The peer ${id} join us...`)
-        if (initialMessage) { peer.send(initialMessage) }
         peer.on('data', (data) => { dataHandler(sw, peer, data) })
       })
 
@@ -116,17 +115,27 @@ class Masq {
     })
   }
 
-  _genGetProfilesLink () {
+  async _genGetProfilesLink () {
     const channel = uuidv4()
-    const challenge = uuidv4()
+    const key = await window.crypto.subtle.generateKey(
+      {
+        name: 'AES-GCM',
+        length: 128
+      },
+      true, // whether the key is extractable (i.e. can be used in exportKey)
+      ['encrypt', 'decrypt'] // can 'encrypt', 'decrypt', 'wrapKey', or 'unwrapKey'
+    )
+    const extractedKey = await window.crypto.subtle.exportKey('raw', key)
+    const keyBase64 = extractedKey.toString('base64')
     const myUrl = new URL(config.MASQ_APP_BASE_URL)
     myUrl.searchParams.set('requestType', 'login')
     myUrl.searchParams.set('channel', channel)
-    myUrl.searchParams.set('challenge', challenge)
+    myUrl.searchParams.set('key', keyBase64)
+
     return {
       link: myUrl.href,
       channel,
-      challenge
+      key
     }
   }
 
@@ -151,24 +160,18 @@ class Masq {
    * We need to get masq-profiles hyperdb key of masq.
    * @returns {string, string, string}
    *  link - the link to open the masq app with the right
-   *  challenge
+   *  key
    *  channel
    */
-  connectToMasq () {
-    // generation of link with new channel and challenge for the sync of new peer
-    const { link, channel, challenge } = this._genGetProfilesLink()
+  async connectToMasq () {
+    // generation of link with new channel and key for the sync of new peer
+    const { link, channel, key } = await this._genGetProfilesLink()
     let registering = false
     let waitingForWriteAccess = false
 
     const handleData = async (sw, peer, data) => {
-      const json = JSON.parse(data)
-      // check challenges
-      if (json.challenge !== challenge) {
-        // This peer may be malicious, close the connection
-        this._connectToMasqErr = Error('Challenge does not match')
-        sw.close()
-        return
-      }
+      // decrypt the received message and check if the right key has been used
+      const json = await utils.decryptMessage(key, data)
 
       switch (json.msg) {
         case 'authorized':
@@ -190,7 +193,7 @@ class Masq {
             // done with the connection to Masq
           }
           registering = true
-          peer.send(JSON.stringify({
+          peer.send(await utils.encryptMessage(key, {
             msg: 'registerUserApp',
             name: this.appName,
             description: this.appDescription,
@@ -201,7 +204,7 @@ class Masq {
 
         case 'notAuthorized':
           registering = true
-          peer.send(JSON.stringify({
+          peer.send(await utils.encryptMessage(key, {
             msg: 'registerUserApp',
             name: this.appName,
             description: this.appDescription,
@@ -236,7 +239,7 @@ class Masq {
           this._startReplication(db)
 
           waitingForWriteAccess = true
-          peer.send(JSON.stringify({
+          peer.send(await utils.encryptMessage(key, {
             msg: 'requestWriteAccess',
             key: db.local.key.toString('hex')
           }))
@@ -277,7 +280,6 @@ class Masq {
 
     return {
       channel,
-      challenge,
       link
     }
   }
