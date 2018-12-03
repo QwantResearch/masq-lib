@@ -2,6 +2,7 @@ const signalserver = require('signalhubws/server')
 const signalhub = require('signalhubws')
 const swarm = require('webrtc-swarm')
 const wrtc = require('wrtc')
+window.crypto = require('@trust/webcrypto')
 
 const Masq = require('../src')
 const MasqAppMock = require('./mockMasqApp')
@@ -48,24 +49,21 @@ afterEach(async () => {
   await masq.destroy()
 })
 
-test('should generate a pairing link', () => {
+test('should generate a pairing link', async () => {
   const uuidSize = 36
-  const { link, channel, challenge } = masq.connectToMasq()
+  const { link, channel } = await masq.connectToMasq()
   const url = new URL(link)
   let base = config.MASQ_APP_BASE_URL
   expect(url.origin + url.pathname).toBe(base)
   expect(url.searchParams.get('channel')).toHaveLength(uuidSize)
-  expect(url.searchParams.get('channel')).toHaveLength(uuidSize)
   expect(url.searchParams.get('channel')).toBe(channel)
-  expect(url.searchParams.get('challenge')).toHaveLength(uuidSize)
-  expect(url.searchParams.get('challenge')).toBe(challenge)
 })
 
 test('should join a channel', async () => {
   expect.assertions(1)
 
-  const pr = new Promise((resolve, reject) => {
-    const { channel } = masq.connectToMasq()
+  const pr = new Promise(async (resolve, reject) => {
+    const { channel } = await masq.connectToMasq()
 
     // simulating masq app
     const hub = signalhub(channel, config.HUB_URLS)
@@ -84,36 +82,44 @@ test('should join a channel', async () => {
   await masq.connectToMasqDone()
 })
 
-test('should be kicked if challenge does not match', async () => {
+test('should be kicked if key is invalid', async () => {
   expect.assertions(2)
 
   const masqAppMock = new MasqAppMock()
 
-  const { channel } = masq.connectToMasq()
-  const wrongChallenge = 'wrongChallenge'
-  // no await as this promise will never resolve because of wrong challenge
+  const { channel } = await masq.connectToMasq()
+  const wrongRawKey = 'wrongChallenge'
   try {
-    masqAppMock.handleConnectionAuthorized(channel, wrongChallenge)
-    await masq.connectToMasqDone()
+    await Promise.all([
+      masqAppMock.handleConnectionAuthorized(channel, wrongRawKey),
+      masq.connectToMasqDone()
+    ])
   } catch (err) {
     expect(err).toBeDefined()
-    expect(err.message).toBe('Challenge does not match')
+    expect(err.message).toBe('Invalid Key')
   }
 })
 
-test('should connect to Masq', async () => {
+test('should connect to Masq with key passed through url param', async () => {
   const masqAppMock = new MasqAppMock()
 
-  const { channel, challenge } = masq.connectToMasq()
-  await masqAppMock.handleConnectionAuthorized(channel, challenge)
-  await masq.connectToMasqDone()
+  const { channel, link } = await masq.connectToMasq()
+  const url = new URL(link)
+  const rawKey = Buffer.from(url.searchParams.get('key'), 'base64')
+
+  await Promise.all([
+    masqAppMock.handleConnectionAuthorized(channel, rawKey),
+    masq.connectToMasqDone()
+  ])
 })
 
 test('should fail when register is refused', async () => {
   const masqAppMock = new MasqAppMock()
 
-  const { channel, challenge } = masq.connectToMasq()
-  await masqAppMock.handleConnectionRegisterRefused(channel, challenge)
+  const { channel, link } = await masq.connectToMasq()
+  const url = new URL(link)
+  const rawKey = Buffer.from(url.searchParams.get('key'), 'base64')
+  await masqAppMock.handleConnectionRegisterRefused(channel, rawKey)
   expect.assertions(1)
   try {
     await masq.connectToMasqDone()
@@ -126,8 +132,10 @@ test('should fail when register is refused', async () => {
 
 async function _initMasqDB () {
   const masqAppMock = new MasqAppMock()
-  const { channel, challenge } = masq.connectToMasq()
-  await masqAppMock.handleConnectionAuthorized(channel, challenge)
+  const { channel, link } = await masq.connectToMasq()
+  const url = new URL(link)
+  const rawKey = Buffer.from(url.searchParams.get('key'), 'base64')
+  await masqAppMock.handleConnectionAuthorized(channel, rawKey)
   await masq.connectToMasqDone()
 }
 
