@@ -128,9 +128,9 @@ class Masq {
     const extractedKey = await window.crypto.subtle.exportKey('raw', key)
     const keyBase64 = extractedKey.toString('base64')
     const myUrl = new URL(config.MASQ_APP_BASE_URL)
-    myUrl.searchParams.set('requestType', 'login')
-    myUrl.searchParams.set('channel', channel)
-    myUrl.searchParams.set('key', keyBase64)
+    const requestType = 'login'
+    const hashParams = JSON.stringify([this.appName, requestType, channel, keyBase64])
+    myUrl.hash = '/' + Buffer.from(hashParams).toString('base64')
 
     return {
       link: myUrl.href,
