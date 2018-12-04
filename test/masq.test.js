@@ -49,14 +49,28 @@ afterEach(async () => {
   await masq.destroy()
 })
 
+function getHashParams (url) {
+  const hash = url.hash.slice(2)
+  const hashParamsArr = JSON.parse(Buffer.from(hash, 'base64').toString('utf8'))
+  const hashParamsObj = {
+    appName: hashParamsArr[0],
+    requestType: hashParamsArr[1],
+    channel: hashParamsArr[2],
+    key: hashParamsArr[3]
+  }
+  hashParamsObj.key = Buffer.from(hashParamsObj.key, 'base64')
+  return hashParamsObj
+}
+
 test('should generate a pairing link', async () => {
   const uuidSize = 36
   const { link, channel } = await masq.connectToMasq()
   const url = new URL(link)
   let base = config.MASQ_APP_BASE_URL
   expect(url.origin + url.pathname).toBe(base)
-  expect(url.searchParams.get('channel')).toHaveLength(uuidSize)
-  expect(url.searchParams.get('channel')).toBe(channel)
+  const hashParams = getHashParams(url)
+  expect(hashParams.channel).toHaveLength(uuidSize)
+  expect(hashParams.channel).toBe(channel)
 })
 
 test('should join a channel', async () => {
@@ -105,10 +119,10 @@ test('should connect to Masq with key passed through url param', async () => {
 
   const { channel, link } = await masq.connectToMasq()
   const url = new URL(link)
-  const rawKey = Buffer.from(url.searchParams.get('key'), 'base64')
+  const hashParams = getHashParams(url)
 
   await Promise.all([
-    masqAppMock.handleConnectionAuthorized(channel, rawKey),
+    masqAppMock.handleConnectionAuthorized(channel, hashParams.key),
     masq.connectToMasqDone()
   ])
 })
@@ -118,8 +132,8 @@ test('should fail when register is refused', async () => {
 
   const { channel, link } = await masq.connectToMasq()
   const url = new URL(link)
-  const rawKey = Buffer.from(url.searchParams.get('key'), 'base64')
-  await masqAppMock.handleConnectionRegisterRefused(channel, rawKey)
+  const hashParams = getHashParams(url)
+  await masqAppMock.handleConnectionRegisterRefused(channel, hashParams.key)
   expect.assertions(1)
   try {
     await masq.connectToMasqDone()
@@ -134,8 +148,8 @@ async function _initMasqDB () {
   const masqAppMock = new MasqAppMock()
   const { channel, link } = await masq.connectToMasq()
   const url = new URL(link)
-  const rawKey = Buffer.from(url.searchParams.get('key'), 'base64')
-  await masqAppMock.handleConnectionAuthorized(channel, rawKey)
+  const hashParams = getHashParams(url)
+  await masqAppMock.handleConnectionAuthorized(channel, hashParams.key)
   await masq.connectToMasqDone()
 }
 
