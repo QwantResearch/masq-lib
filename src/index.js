@@ -21,21 +21,32 @@ class Masq {
    * @param {string} appName - The application name
    */
   constructor (appName, appDescription, appImageURL) {
-    this.userAppDb = null
-    this.userAppRepSW = null
-    this.userAppRepHub = null
+    this._reset()
 
     this.appName = appName
     this.appDescription = appDescription
     this.appImageURL = appImageURL
   }
 
-  destroy () {
+  _reset () {
+    this.userAppDb = null
+    this.userAppRepSW = null
+    this.userAppRepHub = null
+
+    this._connectToMasqErr = null
+    this._connectToMasqDone = false
+  }
+
+  signout () {
     return new Promise((resolve) => {
       if (!this.userAppRepSW) {
+        this._reset()
         resolve()
       }
-      this.userAppRepSW.close(resolve)
+      this.userAppRepSW.close(() => {
+        this._reset()
+        resolve()
+      })
     })
   }
 

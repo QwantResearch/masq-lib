@@ -35,18 +35,15 @@ beforeAll((done) => {
     if (err) throw err
     done()
   })
+  masq = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL)
 })
 
 afterAll((done) => {
   server.close(done)
 })
 
-beforeEach(() => {
-  masq = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL)
-})
-
 afterEach(async () => {
-  await masq.destroy()
+  await masq.signout()
 })
 
 function getHashParams (url) {
