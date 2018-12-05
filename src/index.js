@@ -26,19 +26,47 @@ class Masq {
     this.appName = appName
     this.appDescription = appDescription
     this.appImageURL = appImageURL
+
+    this.userId = null
+    this.userAppDb = null
+
+    this._loadSessionInfo()
   }
 
   _reset () {
-    this.userAppDb = null
     this.userAppRepSW = null
     this.userAppRepHub = null
 
-    this._connectToMasqErr = null
-    this._connectToMasqDone = false
+    this._logIntoMasqErr = null
+    this._logIntoMasqDone = false
   }
 
-  signout () {
+  isLoggedIn () {
+    // is logged in if the userAppDbId is known
+    // (either after register or after construction and load session info)
+    return !!this.userId
+  }
+
+  isConnected () {
+    // is connected if the userAppDb has been created and initialized
+    return !!this.userAppDb
+  }
+
+  async connectToMasq () {
+    if (!this.isLoggedIn()) {
+      await this.disconnect()
+      throw Error('Not logged into Masq')
+    }
+
+    const db = utils.createPromisifiedHyperDB(this.userId)
+    this.userAppDb = db
+    await utils.dbReady(db)
+    this._startReplication()
+  }
+
+  disconnect () {
     return new Promise((resolve) => {
+      this.userAppDb = null
       if (!this.userAppRepSW) {
         this._reset()
         resolve()
@@ -49,6 +77,286 @@ class Masq {
       })
     })
   }
+
+  async signout () {
+    this.userId = null
+    this.userAppDb = null
+
+    await this.disconnect()
+    this._deleteSessionInfo()
+  }
+
+  _deleteSessionInfo () {
+    window.localStorage.removeItem('userId')
+  }
+
+  _storeSessionInfo (userId) {
+    window.localStorage.setItem('userId', userId)
+  }
+
+  _loadSessionInfo () {
+    this.userId = window.localStorage.getItem('userId')
+  }
+
+  async _initSwarmWithDataHandler (channel, dataHandler) {
+    return new Promise((resolve, reject) => {
+      // Subscribe to channel for a limited time to sync with masq
+      debug(`Creation of a hub with ${channel} channel name`)
+      const hub = signalhub(channel, config.HUB_URLS)
+      let sw = null
+
+      if (swarm.WEBRTC_SUPPORT) {
+        sw = swarm(hub)
+      } else {
+        sw = swarm(hub, { wrtc: require('wrtc') })
+      }
+
+      sw.on('peer', (peer, id) => {
+        debug(`The peer ${id} join us...`)
+        peer.on('data', (data) => { dataHandler(sw, peer, data) })
+      })
+
+      sw.on('disconnect', (peer, id) => {
+        sw.close()
+      })
+
+      sw.on('close', () => {
+        resolve()
+      })
+    })
+  }
+
+  async _genConnectionMaterial () {
+    const channel = uuidv4()
+    const key = await window.crypto.subtle.generateKey(
+      {
+        name: 'AES-GCM',
+        length: 128
+      },
+      true, // whether the key is extractable (i.e. can be used in exportKey)
+      ['encrypt', 'decrypt'] // can 'encrypt', 'decrypt', 'wrapKey', or 'unwrapKey'
+    )
+    const extractedKey = await window.crypto.subtle.exportKey('raw', key)
+    const keyBase64 = extractedKey.toString('base64')
+    const myUrl = new URL(config.MASQ_APP_BASE_URL)
+    const requestType = 'login'
+    const hashParams = JSON.stringify([this.appName, requestType, channel, keyBase64])
+    myUrl.hash = '/' + Buffer.from(hashParams).toString('base64')
+
+    return {
+      link: myUrl.href,
+      channel,
+      key
+    }
+  }
+
+  _startReplication () {
+    const discoveryKey = this.userAppDb.discoveryKey.toString('hex')
+    this.userAppRepHub = signalhub(discoveryKey, config.HUB_URLS)
+
+    if (swarm.WEBRTC_SUPPORT) {
+      this.userAppRepSW = swarm(this.userAppRepHub)
+    } else {
+      this.userAppRepSW = swarm(this.userAppRepHub, { wrtc: require('wrtc') })
+    }
+
+    this.userAppRepSW.on('peer', async (peer, id) => {
+      const stream = this.userAppDb.replicate({ live: true })
+      pump(peer, stream, peer)
+    })
+  }
+
+  async _isRegistered () {
+    // is registered if the userId is the id of a known db
+    if (this.userId) {
+      return false
+    }
+    return utils.dbExists(this.userId)
+  }
+
+  async _requestUserAppRegister (key, peer) {
+    peer.send(await utils.encryptMessage(key, {
+      msg: 'registerUserApp',
+      name: this.appName,
+      description: this.appDescription,
+      imageURL: this.appImageURL
+    }))
+  }
+
+  async _requestWriteAccess (key, peer) {
+    peer.send(await utils.encryptMessage(key, {
+      msg: 'requestWriteAccess',
+      key: this.userAppDb.local.key.toString('hex')
+    }))
+  }
+
+  // All error handling for received messages
+  _checkMessage (json, registering, waitingForWriteAccess, errorHandler) {
+    let err = false
+    const handleError = () => {
+      errorHandler()
+      err = true
+    }
+    switch (json.msg) {
+      case 'authorized':
+        if (!json.userId) {
+          handleError('User Id not found in \'authorized\' message')
+        }
+        break
+
+      case 'notAuthorized':
+        break
+
+      case 'masqAccessGranted':
+        if (!registering) {
+          handleError('Unexpectedly received "masqAccessGranted" message while not registering')
+          break
+        }
+
+        if (!json.key) {
+          handleError('Database key not found in "masqAccessGranted" message')
+          break
+        }
+
+        if (!json.userId) {
+          handleError('User Id not found in "masqAccessGranted" message')
+        }
+        break
+
+      case 'masqAccessRefused':
+        if (!registering) {
+          handleError('Unexpectedly received "masqAccessRefused" while not registering')
+        }
+        break
+
+      case 'writeAccessGranted':
+        if (!waitingForWriteAccess) {
+          handleError('Unexpectedly received "writeAccessGranted" while not waiting for write access')
+        }
+        break
+
+      default:
+        handleError(`Unexpectedly received message with type ${json.msg}`)
+        break
+    }
+
+    return err
+  }
+
+  /**
+   * If this is the first time, this.dbs.profiles is empty.
+   * We need to get masq-profiles hyperdb key of masq.
+   * @returns {string, string, string}
+   *  link - the link to open the masq app with the right
+   *  key
+   *  channel
+   */
+  async logIntoMasq (stayConnected) {
+    // generation of link with new channel and key for the sync of new peer
+    const { link, channel, key } = await this._genConnectionMaterial()
+    let registering = false
+    let waitingForWriteAccess = false
+
+    const handleData = async (sw, peer, data) => {
+      // decrypt the received message and check if the right key has been used
+      const json = await utils.decryptMessage(key, data)
+
+      const handleError = (msg) => {
+        this._logIntoMasqErr = Error(msg)
+        sw.close()
+      }
+
+      this._checkMessage(json, registering, waitingForWriteAccess, handleError)
+
+      switch (json.msg) {
+        case 'authorized':
+          // Store the session info
+          if (stayConnected) this._storeSessionInfo(json.userId)
+
+          this.userId = json.userId
+
+          // Check if the User-app is already registered
+          if (await this._isRegistered()) {
+            await this.connectToMasq()
+            // logged into Masq
+            sw.close()
+            return
+          }
+
+          // if this UserApp instance is not registered
+          registering = true
+          this._requestUserAppRegister(key, peer)
+          break
+
+        case 'notAuthorized':
+          // if this User-app is not registered
+          registering = true
+          this._requestUserAppRegister(key, peer)
+          break
+
+        case 'masqAccessGranted':
+          registering = false
+
+          await this.connectToMasq()
+
+          // Store the session info
+          if (stayConnected) this._storeSessionInfo(json.userId)
+          this.userId = json.userId
+
+          waitingForWriteAccess = true
+          this._requestWriteAccess(key, peer)
+          break
+
+        case 'masqAccessRefused':
+          registering = false
+          handleError('Masq access refused by the user')
+          return
+
+        case 'writeAccessGranted':
+          waitingForWriteAccess = false
+          sw.close()
+          break
+      }
+    }
+
+    this._initSwarmWithDataHandler(channel, handleData).then(
+      () => {
+        this._logIntoMasqDone = true
+        if (this._onLogIntoMasqDone) this._onLogIntoMasqDone()
+      }
+    )
+
+    return {
+      channel,
+      link
+    }
+  }
+
+  logIntoMasqDone () {
+    return new Promise((resolve, reject) => {
+      if (this._logIntoMasqDone) {
+        this._logIntoMasqDone = false
+        if (this._logIntoMasqErr) {
+          return reject(this._logIntoMasqErr)
+        } else {
+          return resolve()
+        }
+      }
+      this._onLogIntoMasqDone = () => {
+        this._onLogIntoMasqDone = undefined
+        this._logIntoMasqDone = false
+        if (this._logIntoMasqErr) {
+          return reject(this._logIntoMasqErr)
+        } else {
+          return resolve()
+        }
+      }
+    })
+  }
+
+  //
+  // Database Access Functions
+  //
 
   _getDB () {
     if (!this.userAppDb) throw Error('Not connected to Masq')
@@ -96,225 +404,6 @@ class Masq {
   async del (key) {
     let db = this._getDB()
     return db.delAsync(key)
-  }
-
-  async _initSwarmWithDataHandler (channel, dataHandler) {
-    return new Promise((resolve, reject) => {
-      // Subscribe to channel for a limited time to sync with masq
-      debug(`Creation of a hub with ${channel} channel name`)
-      const hub = signalhub(channel, config.HUB_URLS)
-      let sw = null
-
-      if (swarm.WEBRTC_SUPPORT) {
-        sw = swarm(hub)
-      } else {
-        sw = swarm(hub, { wrtc: require('wrtc') })
-      }
-
-      sw.on('peer', (peer, id) => {
-        debug(`The peer ${id} join us...`)
-        peer.on('data', (data) => { dataHandler(sw, peer, data) })
-      })
-
-      sw.on('disconnect', (peer, id) => {
-        sw.close()
-      })
-
-      sw.on('close', () => {
-        resolve()
-      })
-    })
-  }
-
-  async _genGetProfilesLink () {
-    const channel = uuidv4()
-    const key = await window.crypto.subtle.generateKey(
-      {
-        name: 'AES-GCM',
-        length: 128
-      },
-      true, // whether the key is extractable (i.e. can be used in exportKey)
-      ['encrypt', 'decrypt'] // can 'encrypt', 'decrypt', 'wrapKey', or 'unwrapKey'
-    )
-    const extractedKey = await window.crypto.subtle.exportKey('raw', key)
-    const keyBase64 = extractedKey.toString('base64')
-    const myUrl = new URL(config.MASQ_APP_BASE_URL)
-    const requestType = 'login'
-    const hashParams = JSON.stringify([this.appName, requestType, channel, keyBase64])
-    myUrl.hash = '/' + Buffer.from(hashParams).toString('base64')
-
-    return {
-      link: myUrl.href,
-      channel,
-      key
-    }
-  }
-
-  _startReplication (db) {
-    const discoveryKey = db.discoveryKey.toString('hex')
-    this.userAppRepHub = signalhub(discoveryKey, config.HUB_URLS)
-
-    if (swarm.WEBRTC_SUPPORT) {
-      this.userAppRepSW = swarm(this.userAppRepHub)
-    } else {
-      this.userAppRepSW = swarm(this.userAppRepHub, { wrtc: require('wrtc') })
-    }
-
-    this.userAppRepSW.on('peer', async (peer, id) => {
-      const stream = db.replicate({ live: true })
-      pump(peer, stream, peer)
-    })
-  }
-
-  /**
-   * If this is the first time, this.dbs.profiles is empty.
-   * We need to get masq-profiles hyperdb key of masq.
-   * @returns {string, string, string}
-   *  link - the link to open the masq app with the right
-   *  key
-   *  channel
-   */
-  async connectToMasq () {
-    // generation of link with new channel and key for the sync of new peer
-    const { link, channel, key } = await this._genGetProfilesLink()
-    let registering = false
-    let waitingForWriteAccess = false
-
-    const handleData = async (sw, peer, data) => {
-      // decrypt the received message and check if the right key has been used
-      const json = await utils.decryptMessage(key, data)
-
-      switch (json.msg) {
-        case 'authorized':
-          if (!json.id) {
-            this._connectToMasqErr = Error('Database Id not found in \'authorized\' message')
-            sw.close()
-            return
-          }
-
-          const dbId = json.id
-          if (utils.dbExists(dbId)) {
-            const db = utils.createPromisifiedHyperDB(dbId)
-            await utils.dbReady(db)
-            this.userAppDb = db
-
-            debug(`Start replication for db with id ${json.id}`)
-            this._startReplication(db)
-            return
-            // done with the connection to Masq
-          }
-          registering = true
-          peer.send(await utils.encryptMessage(key, {
-            msg: 'registerUserApp',
-            name: this.appName,
-            description: this.appDescription,
-            imageURL: this.appImageURL
-          }))
-
-          break
-
-        case 'notAuthorized':
-          registering = true
-          peer.send(await utils.encryptMessage(key, {
-            msg: 'registerUserApp',
-            name: this.appName,
-            description: this.appDescription,
-            imageURL: this.appImageURL
-          }))
-          break
-
-        case 'masqAccessGranted':
-          if (!registering) {
-            this._connectToMasqErr = Error('Unexpectedly received dbKey while not registering')
-            sw.close()
-            return
-          }
-          registering = false
-
-          if (!json.key) {
-            this._connectToMasqErr = Error('Database key not found in \'dbKey\' message')
-            sw.close()
-            return
-          }
-
-          if (!json.id) {
-            this._connectToMasqErr = Error('Database id not found in \'dbKey\' message')
-            sw.close()
-            return
-          }
-
-          const db = utils.createPromisifiedHyperDB(json.id, json.key)
-          await utils.dbReady(db)
-          this.userAppDb = db
-
-          this._startReplication(db)
-
-          waitingForWriteAccess = true
-          peer.send(await utils.encryptMessage(key, {
-            msg: 'requestWriteAccess',
-            key: db.local.key.toString('hex')
-          }))
-          break
-
-        case 'masqAccessRefused':
-          if (!registering) {
-            this._connectToMasqErr = Error('Unexpectedly received dbKey while not registering')
-            sw.close()
-            return
-          }
-          this._connectToMasqErr = Error('Masq access refused by the user')
-          sw.close()
-          return
-
-        case 'writeAccessGranted':
-          if (!waitingForWriteAccess) {
-            this._connectToMasqErr = Error('Unexpectedly received writeAccessGranted while not registering')
-            sw.close()
-            return
-          }
-          waitingForWriteAccess = false
-
-          sw.close()
-          break
-
-        default:
-          break
-      }
-    }
-
-    this._initSwarmWithDataHandler(channel, handleData).then(
-      () => {
-        this._connectToMasqDone = true
-        if (this._onConnectToMasqDone) this._onConnectToMasqDone()
-      }
-    )
-
-    return {
-      channel,
-      link
-    }
-  }
-
-  connectToMasqDone () {
-    return new Promise((resolve, reject) => {
-      if (this._connectToMasqDone) {
-        this._connectToMasqDone = false
-        if (this._connectToMasqErr) {
-          return reject(this._connectToMasqErr)
-        } else {
-          return resolve()
-        }
-      }
-      this._onConnectToMasqDone = () => {
-        this._onConnectToMasqDone = undefined
-        this._connectToMasqDone = false
-        if (this._connectToMasqErr) {
-          return reject(this._connectToMasqErr)
-        } else {
-          return resolve()
-        }
-      }
-    })
   }
 }
 

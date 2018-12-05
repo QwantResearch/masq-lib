@@ -29,11 +29,13 @@ let masq = null
 
 jest.setTimeout(30000)
 
-beforeAll((done) => {
+beforeAll(async () => {
   server = signalserver()
-  server.listen(8080, (err) => {
-    if (err) throw err
-    done()
+  await new Promise((resolve) => {
+    server.listen(8080, (err) => {
+      if (err) throw err
+      resolve()
+    })
   })
   masq = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL)
 })
@@ -61,7 +63,7 @@ function getHashParams (url) {
 
 test('should generate a pairing link', async () => {
   const uuidSize = 36
-  const { link, channel } = await masq.connectToMasq()
+  const { link, channel } = await masq.logIntoMasq()
   const url = new URL(link)
   let base = config.MASQ_APP_BASE_URL
   expect(url.origin + url.pathname).toBe(base)
@@ -74,7 +76,7 @@ test('should join a channel', async () => {
   expect.assertions(1)
 
   const pr = new Promise(async (resolve, reject) => {
-    const { channel } = await masq.connectToMasq()
+    const { channel } = await masq.logIntoMasq()
 
     // simulating masq app
     const hub = signalhub(channel, config.HUB_URLS)
@@ -90,7 +92,344 @@ test('should join a channel', async () => {
     })
   })
   await pr
-  await masq.connectToMasqDone()
+  await masq.logIntoMasqDone()
+})
+
+test('should connect to Masq with key passed through url param', async () => {
+  expect(masq.isLoggedIn()).toBe(false)
+
+  const masqAppMock = new MasqAppMock()
+
+  const { channel, link } = await masq.logIntoMasq()
+  const url = new URL(link)
+  const hashParams = getHashParams(url)
+
+  await Promise.all([
+    masqAppMock.handleConnectionAuthorized(channel, hashParams.key),
+    masq.logIntoMasqDone()
+  ])
+
+  expect(masq.isLoggedIn()).toBe(true)
+})
+
+test('should be able to repeat login-disconnect-connect-signout', async () => {
+  expect(masq.isLoggedIn()).toBe(false)
+
+  const masqAppMock = new MasqAppMock()
+
+  const login = async () => {
+    const { channel, link } = await masq.logIntoMasq()
+    const url = new URL(link)
+    const hashParams = getHashParams(url)
+
+    await Promise.all([
+      masqAppMock.handleConnectionAuthorized(channel, hashParams.key),
+      masq.logIntoMasqDone()
+    ])
+  }
+
+  for (let i = 0; i < 5; i++) {
+    await login()
+    expect(masq.isLoggedIn()).toBe(true)
+    expect(masq.isConnected()).toBe(true)
+
+    await masq.disconnect()
+    expect(masq.isLoggedIn()).toBe(true)
+    expect(masq.isConnected()).toBe(false)
+
+    await masq.connectToMasq()
+    expect(masq.isLoggedIn()).toBe(true)
+    expect(masq.isConnected()).toBe(true)
+
+    await masq.signout()
+    expect(masq.isLoggedIn()).toBe(false)
+    expect(masq.isConnected()).toBe(false)
+  }
+})
+
+test('should fail when connect without prior login', async () => {
+  expect.assertions(12)
+  expect(masq.isLoggedIn()).toBe(false)
+
+  const masqAppMock = new MasqAppMock()
+
+  const login = async () => {
+    const { channel, link } = await masq.logIntoMasq()
+    const url = new URL(link)
+    const hashParams = getHashParams(url)
+
+    await Promise.all([
+      masqAppMock.handleConnectionAuthorized(channel, hashParams.key),
+      masq.logIntoMasqDone()
+    ])
+  }
+
+  try {
+    await masq.connectToMasq()
+  } catch (err) {
+    expect(err.message).toBe('Not logged into Masq')
+    expect(masq.isLoggedIn()).toBe(false)
+    expect(masq.isConnected()).toBe(false)
+  }
+
+  await login()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(true)
+
+  await masq.disconnect()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(false)
+
+  await masq.connectToMasq()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(true)
+
+  await masq.signout()
+  expect(masq.isLoggedIn()).toBe(false)
+  expect(masq.isConnected()).toBe(false)
+})
+
+test('should fail when connect after signout without prior login', async () => {
+  expect.assertions(12)
+  expect(masq.isLoggedIn()).toBe(false)
+
+  const masqAppMock = new MasqAppMock()
+
+  const login = async () => {
+    const { channel, link } = await masq.logIntoMasq()
+    const url = new URL(link)
+    const hashParams = getHashParams(url)
+
+    await Promise.all([
+      masqAppMock.handleConnectionAuthorized(channel, hashParams.key),
+      masq.logIntoMasqDone()
+    ])
+  }
+
+  await login()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(true)
+
+  await masq.disconnect()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(false)
+
+  await masq.connectToMasq()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(true)
+
+  await masq.signout()
+  expect(masq.isLoggedIn()).toBe(false)
+  expect(masq.isConnected()).toBe(false)
+
+  try {
+    await masq.connectToMasq()
+  } catch (err) {
+    expect(err.message).toBe('Not logged into Masq')
+    expect(masq.isLoggedIn()).toBe(false)
+    expect(masq.isConnected()).toBe(false)
+  }
+})
+
+test('should be able to disconnect even if not logged in or connected', async () => {
+  expect(masq.isLoggedIn()).toBe(false)
+
+  const masqAppMock = new MasqAppMock()
+
+  const login = async () => {
+    const { channel, link } = await masq.logIntoMasq()
+    const url = new URL(link)
+    const hashParams = getHashParams(url)
+
+    await Promise.all([
+      masqAppMock.handleConnectionAuthorized(channel, hashParams.key),
+      masq.logIntoMasqDone()
+    ])
+  }
+
+  await masq.disconnect()
+  expect(masq.isLoggedIn()).toBe(false)
+  expect(masq.isConnected()).toBe(false)
+
+  await login()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(true)
+
+  await masq.disconnect()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(false)
+
+  await masq.connectToMasq()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(true)
+
+  await masq.signout()
+  expect(masq.isLoggedIn()).toBe(false)
+  expect(masq.isConnected()).toBe(false)
+})
+
+test('should be able to disconnect more than once without error', async () => {
+  expect(masq.isLoggedIn()).toBe(false)
+
+  const masqAppMock = new MasqAppMock()
+
+  const login = async () => {
+    const { channel, link } = await masq.logIntoMasq()
+    const url = new URL(link)
+    const hashParams = getHashParams(url)
+
+    await Promise.all([
+      masqAppMock.handleConnectionAuthorized(channel, hashParams.key),
+      masq.logIntoMasqDone()
+    ])
+  }
+
+  try {
+    await masq.connectToMasq()
+  } catch (err) {
+    expect(err.message).toBe('Not logged into Masq')
+    expect(masq.isLoggedIn()).toBe(false)
+    expect(masq.isConnected()).toBe(false)
+  }
+
+  await login()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(true)
+
+  await masq.disconnect()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(false)
+
+  await masq.disconnect()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(false)
+
+  await masq.connectToMasq()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(true)
+
+  await masq.signout()
+  expect(masq.isLoggedIn()).toBe(false)
+  expect(masq.isConnected()).toBe(false)
+})
+
+test('should be able to connect more than once without error', async () => {
+  expect(masq.isLoggedIn()).toBe(false)
+
+  const masqAppMock = new MasqAppMock()
+
+  const login = async () => {
+    const { channel, link } = await masq.logIntoMasq()
+    const url = new URL(link)
+    const hashParams = getHashParams(url)
+
+    await Promise.all([
+      masqAppMock.handleConnectionAuthorized(channel, hashParams.key),
+      masq.logIntoMasqDone()
+    ])
+  }
+
+  await login()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(true)
+
+  await masq.disconnect()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(false)
+
+  await masq.connectToMasq()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(true)
+
+  await masq.connectToMasq()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(true)
+
+  await masq.signout()
+  expect(masq.isLoggedIn()).toBe(false)
+  expect(masq.isConnected()).toBe(false)
+})
+
+test('should be able to sign out more than once without error', async () => {
+  expect(masq.isLoggedIn()).toBe(false)
+
+  const masqAppMock = new MasqAppMock()
+
+  const login = async () => {
+    const { channel, link } = await masq.logIntoMasq()
+    const url = new URL(link)
+    const hashParams = getHashParams(url)
+
+    await Promise.all([
+      masqAppMock.handleConnectionAuthorized(channel, hashParams.key),
+      masq.logIntoMasqDone()
+    ])
+  }
+
+  await login()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(true)
+
+  await masq.disconnect()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(false)
+
+  await masq.connectToMasq()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(true)
+
+  await masq.signout()
+  expect(masq.isLoggedIn()).toBe(false)
+  expect(masq.isConnected()).toBe(false)
+
+  await masq.signout()
+  expect(masq.isLoggedIn()).toBe(false)
+  expect(masq.isConnected()).toBe(false)
+
+  await login()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(true)
+})
+
+test('should be able to login more than once without error', async () => {
+  expect(masq.isLoggedIn()).toBe(false)
+
+  const masqAppMock = new MasqAppMock()
+
+  const login = async () => {
+    const { channel, link } = await masq.logIntoMasq()
+    const url = new URL(link)
+    const hashParams = getHashParams(url)
+
+    await Promise.all([
+      masqAppMock.handleConnectionAuthorized(channel, hashParams.key),
+      masq.logIntoMasqDone()
+    ])
+  }
+
+  await login()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(true)
+
+  await login()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(true)
+
+  await login()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(true)
+
+  await masq.disconnect()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(false)
+
+  await masq.connectToMasq()
+  expect(masq.isLoggedIn()).toBe(true)
+  expect(masq.isConnected()).toBe(true)
+
+  await masq.signout()
+  expect(masq.isLoggedIn()).toBe(false)
+  expect(masq.isConnected()).toBe(false)
 })
 
 test('should be kicked if key is invalid', async () => {
@@ -98,12 +437,12 @@ test('should be kicked if key is invalid', async () => {
 
   const masqAppMock = new MasqAppMock()
 
-  const { channel } = await masq.connectToMasq()
+  const { channel } = await masq.logIntoMasq()
   const wrongRawKey = 'wrongChallenge'
   try {
     await Promise.all([
       masqAppMock.handleConnectionAuthorized(channel, wrongRawKey),
-      masq.connectToMasqDone()
+      masq.logIntoMasqDone()
     ])
   } catch (err) {
     expect(err).toBeDefined()
@@ -111,43 +450,31 @@ test('should be kicked if key is invalid', async () => {
   }
 })
 
-test('should connect to Masq with key passed through url param', async () => {
-  const masqAppMock = new MasqAppMock()
-
-  const { channel, link } = await masq.connectToMasq()
-  const url = new URL(link)
-  const hashParams = getHashParams(url)
-
-  await Promise.all([
-    masqAppMock.handleConnectionAuthorized(channel, hashParams.key),
-    masq.connectToMasqDone()
-  ])
-})
-
 test('should fail when register is refused', async () => {
   const masqAppMock = new MasqAppMock()
 
-  const { channel, link } = await masq.connectToMasq()
+  const { channel, link } = await masq.logIntoMasq()
   const url = new URL(link)
   const hashParams = getHashParams(url)
   await masqAppMock.handleConnectionRegisterRefused(channel, hashParams.key)
   expect.assertions(1)
   try {
-    await masq.connectToMasqDone()
+    await masq.logIntoMasqDone()
   } catch (e) {
     expect(e.message).toBe('Masq access refused by the user')
   }
 })
 
-// TODO tests for unexpected message received
+// TODO add tests for unexpected message received
+// TODO add tests for connect-disconnect-connect
 
 async function _initMasqDB () {
   const masqAppMock = new MasqAppMock()
-  const { channel, link } = await masq.connectToMasq()
+  const { channel, link } = await masq.logIntoMasq()
   const url = new URL(link)
   const hashParams = getHashParams(url)
   await masqAppMock.handleConnectionAuthorized(channel, hashParams.key)
-  await masq.connectToMasqDone()
+  await masq.logIntoMasqDone()
 }
 
 test('put/get should put and get an item', async () => {
