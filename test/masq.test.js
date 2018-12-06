@@ -63,23 +63,24 @@ function getHashParams (url) {
 
 test('should generate a pairing link', async () => {
   const uuidSize = 36
-  const { link, channel } = await masq.logIntoMasq()
+  const { link } = await masq.logIntoMasq()
   const url = new URL(link)
   let base = config.MASQ_APP_BASE_URL
   expect(url.origin + url.pathname).toBe(base)
   const hashParams = getHashParams(url)
   expect(hashParams.channel).toHaveLength(uuidSize)
-  expect(hashParams.channel).toBe(channel)
 })
 
 test('should join a channel', async () => {
   expect.assertions(1)
 
   const pr = new Promise(async (resolve, reject) => {
-    const { channel } = await masq.logIntoMasq()
+    const { link } = await masq.logIntoMasq()
+    const url = new URL(link)
+    const hashParams = getHashParams(url)
 
     // simulating masq app
-    const hub = signalhub(channel, config.HUB_URLS)
+    const hub = signalhub(hashParams.channel, config.HUB_URLS)
     const sw = swarm(hub, { wrtc })
 
     sw.on('peer', (peer, id) => {
