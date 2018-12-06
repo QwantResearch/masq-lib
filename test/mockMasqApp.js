@@ -6,6 +6,10 @@ const config = require('../config/config')
 const utils = require('../src/utils')
 
 class MockMasqApp {
+  constructor () {
+    this.db = null
+  }
+
   handleConnectionAuthorized (channel, key) {
     return this._handleConnection(true, true)(channel, key)
   }
@@ -24,7 +28,6 @@ class MockMasqApp {
         const hub = signalhub(channel, config.HUB_URLS)
         const sw = swarm(hub, { wrtc })
         const userAppId = 'userAppId'
-        let db
 
         let key
         try {
@@ -62,15 +65,14 @@ class MockMasqApp {
                   reject(Error('Already registered but received message with type "registered"'))
                 }
                 if (registerAccepted) {
-                  db = utils.createPromisifiedHyperDB(userAppId)
-                  utils.dbReady(db).then(async () => {
-                    peer.send(await utils.encryptMessage(key, {
-                      msg: 'masqAccessGranted',
-                      userId: userAppId,
-                      key: db.discoveryKey.toString('hex')
-                    }))
-                    registered = true
-                  })
+                  this.db = utils.createPromisifiedHyperDB(userAppId)
+                  await utils.dbReady(this.db)
+                  peer.send(await utils.encryptMessage(key, {
+                    msg: 'masqAccessGranted',
+                    userId: userAppId,
+                    key: this.db.discoveryKey.toString('hex')
+                  }))
+                  registered = true
                 } else {
                   peer.send(await utils.encryptMessage(key, {
                     msg: 'masqAccessRefused'
@@ -83,7 +85,7 @@ class MockMasqApp {
                   reject(Error('Expected to receive message with type "register", but received "requestWriteAccess"'))
                 }
 
-                db.authorizeAsync(Buffer.from(json.key, 'hex')).then(async () => {
+                this.db.authorizeAsync(Buffer.from(json.key, 'hex')).then(async () => {
                   peer.send(await utils.encryptMessage(key, {
                     msg: 'writeAccessGranted'
                   }))
