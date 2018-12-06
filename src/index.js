@@ -248,8 +248,6 @@ class Masq {
    * We need to get masq-profiles hyperdb key of masq.
    * @returns {string, string, string}
    *  link - the link to open the masq app with the right
-   *  key
-   *  channel
    */
   async logIntoMasq (stayConnected) {
     // generation of link with new channel and key for the sync of new peer
@@ -327,7 +325,6 @@ class Masq {
     )
 
     return {
-      channel,
       link
     }
   }
