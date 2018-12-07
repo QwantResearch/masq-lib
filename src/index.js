@@ -256,12 +256,22 @@ class Masq {
     let waitingForWriteAccess = false
 
     const handleData = async (sw, peer, data) => {
-      // decrypt the received message and check if the right key has been used
-      const json = await utils.decryptMessage(key, data)
-
       const handleError = (msg) => {
         this._logIntoMasqErr = Error(msg)
         sw.close()
+      }
+
+      // decrypt the received message and check if the right key has been used
+      let json
+      try {
+        json = await utils.decryptMessage(key, data)
+      } catch (err) {
+        if (err.message === 'Unsupported state or unable to authenticate data') {
+          handleError('Unable to read the message with the key sent to Masq-app')
+          return
+        }
+        handleError('Unknown error while decrypting: ' + err.message)
+        return
       }
 
       this._checkMessage(json, registering, waitingForWriteAccess, handleError)
