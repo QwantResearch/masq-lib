@@ -565,15 +565,43 @@ test('should be kicked if key is invalid', async () => {
   const { link } = await masq.logIntoMasq()
   const url = new URL(link)
   const hashParams = getHashParams(url)
-  const wrongRawKey = 'wrongChallenge'
+  const invalidKey = 'wrongChallenge'
   try {
     await Promise.all([
-      masqAppMock.handleConnectionAuthorized(hashParams.channel, wrongRawKey),
+      masqAppMock.handleConnectionAuthorized(hashParams.channel, invalidKey),
       masq.logIntoMasqDone()
     ])
   } catch (err) {
     expect(err).toBeDefined()
     expect(err.message).toBe('Invalid Key')
+  }
+})
+
+test('should be kicked if wrong key is used', async () => {
+  expect.assertions(2)
+
+  try {
+    const masqAppMock = new MasqAppMock()
+
+    const { link } = await masq.logIntoMasq()
+    const url = new URL(link)
+    const hashParams = getHashParams(url)
+    const wrongCryptoKey = await window.crypto.subtle.generateKey(
+      {
+        name: 'AES-GCM',
+        length: 128
+      },
+      true,
+      ['encrypt', 'decrypt']
+    )
+    const extractedWrongKey = await window.crypto.subtle.exportKey('raw', wrongCryptoKey)
+    await Promise.all([
+      masqAppMock.handleConnectionAuthorized(hashParams.channel, extractedWrongKey),
+      masq.logIntoMasqDone()
+    ])
+  } catch (err) {
+    expect(err).toBeDefined()
+    expect(err.message).toBe('Unable to read the message with the key sent to Masq-app')
   }
 })
 

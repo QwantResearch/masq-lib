@@ -39,6 +39,7 @@ class MockMasqApp {
             ['encrypt', 'decrypt']
           )
         } catch (err) {
+          sw.close()
           return reject(Error('Invalid Key'))
         }
 
