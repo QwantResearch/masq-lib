@@ -70,6 +70,7 @@ class Masq {
       if (!this.userAppRepSW) {
         this._reset()
         resolve()
+        return
       }
       this.userAppRepSW.close(() => {
         this._reset()
@@ -168,10 +169,7 @@ class Masq {
 
   async _isRegistered () {
     // is registered if the userId is the id of a known db
-    if (this.userId) {
-      return false
-    }
-    return utils.dbExists(this.userId)
+    return !this.userId || utils.dbExists(this.userId)
   }
 
   async _requestUserAppRegister (key, peer) {
