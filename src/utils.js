@@ -55,13 +55,13 @@ async function encryptMessage (key, data) {
   const strData = JSON.stringify(data)
   const bufferData = Buffer.from(strData, 'utf8')
   const iv = genIV()
-  const encrypted = new Uint8Array(await window.crypto.subtle.encrypt(
+  const encrypted = await window.crypto.subtle.encrypt(
     {
       name: 'AES-GCM',
       iv: iv
     },
     key,
-    bufferData))
+    bufferData)
   const encryptedBase64 = Buffer.from(encrypted).toString('base64')
   const ivBase64 = Buffer.from(iv).toString('base64')
   return JSON.stringify({
@@ -82,7 +82,7 @@ async function decryptMessage (key, data) {
     key,
     encryptedData
   )
-  const decryptedDataBuffer = new Uint8Array(decryptedData)
+  const decryptedDataBuffer = decryptedData
   const decryptedJson = JSON.parse(Buffer.from(decryptedDataBuffer).toString('utf8'))
   return decryptedJson
 }
