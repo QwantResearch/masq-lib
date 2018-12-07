@@ -43,9 +43,9 @@ function dbExists (dbName) {
   })
 }
 
-const ivLen = 16
-
 function genIV () {
+  const ivLen = 16
+
   const initializationVector = new Uint8Array(ivLen)
   window.crypto.getRandomValues(initializationVector)
   return initializationVector
