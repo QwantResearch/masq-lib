@@ -197,7 +197,7 @@ class Masq {
     }
     switch (json.msg) {
       case 'authorized':
-        if (!json.userId) {
+        if (!json.id) {
           handleError('User Id not found in \'authorized\' message')
         }
         break
@@ -216,7 +216,7 @@ class Masq {
           break
         }
 
-        if (!json.userId) {
+        if (!json.id) {
           handleError('User Id not found in "masqAccessGranted" message')
         }
         break
@@ -277,9 +277,9 @@ class Masq {
       switch (json.msg) {
         case 'authorized':
           // Store the session info
-          if (stayConnected) this._storeSessionInfo(json.userId)
+          if (stayConnected) this._storeSessionInfo(json.id)
 
-          this.userId = json.userId
+          this.userId = json.id
 
           // Check if the User-app is already registered
           if (await this._isRegistered()) {
@@ -306,8 +306,8 @@ class Masq {
           await this.connectToMasq()
 
           // Store the session info
-          if (stayConnected) this._storeSessionInfo(json.userId)
-          this.userId = json.userId
+          if (stayConnected) this._storeSessionInfo(json.id)
+          this.userId = json.id
 
           waitingForWriteAccess = true
           this._requestWriteAccess(key, peer)
