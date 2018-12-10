@@ -413,6 +413,22 @@ class Masq {
     let db = this._getDB()
     return db.delAsync(key)
   }
+
+  /**
+   * List all keys and values
+   * @param {string} prefix - Prefix
+   * @returns {Promise}
+   */
+  async list (prefix) {
+    let db = this._getDB()
+    const list = await db.listAsync(prefix)
+    const reformattedDic = list.reduce((dic, e) => {
+      const el = Array.isArray(e) ? e[0] : e
+      dic[el.key] = el.value
+      return dic
+    }, {})
+    return reformattedDic
+  }
 }
 
 module.exports = Masq

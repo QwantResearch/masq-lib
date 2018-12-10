@@ -506,6 +506,28 @@ test('put/get should put and get an item', async () => {
   expect(res).toEqual(value)
 })
 
+test('list should get every put items', async () => {
+  expect.assertions(1)
+  await logInWithMasqAppMock()
+  const keyValues = {
+    'hello': { data: 'world' },
+    'hello1': { data: 'world1' },
+    'hello2': { data: 'world2' },
+    'hello3': { data: 'world3' }
+  }
+  const promiseArr = Object.keys(keyValues).map(k =>
+    masq.put(k, keyValues[k])
+  )
+  await Promise.all(promiseArr)
+  await masq.del('hello2')
+  const res = await masq.list()
+  const expected = Object.keys(keyValues).reduce((dic, k) => {
+    if (k !== 'hello2') dic[k] = keyValues[k]
+    return dic
+  }, {})
+  expect(res).toEqual(expected)
+})
+
 test('del should del an item', async () => {
   expect.assertions(1)
   await logInWithMasqAppMock()
