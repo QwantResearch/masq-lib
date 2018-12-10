@@ -307,7 +307,10 @@ class Masq {
           if (stayConnected) this._storeSessionInfo(json.id)
           this.userId = json.id
 
-          await this.connectToMasq()
+          const db = utils.createPromisifiedHyperDB(this.userId, json.key)
+          this.userAppDb = db
+          await utils.dbReady(db)
+          this._startReplication()
 
           waitingForWriteAccess = true
           this._requestWriteAccess(key, peer)
