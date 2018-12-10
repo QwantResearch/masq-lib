@@ -303,11 +303,11 @@ class Masq {
         case 'masqAccessGranted':
           registering = false
 
-          await this.connectToMasq()
-
           // Store the session info
           if (stayConnected) this._storeSessionInfo(json.id)
           this.userId = json.id
+
+          await this.connectToMasq()
 
           waitingForWriteAccess = true
           this._requestWriteAccess(key, peer)
