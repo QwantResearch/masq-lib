@@ -50,7 +50,7 @@ class MockMasqApp {
           if (authorized) {
             peer.send(await utils.encryptMessage(key, {
               msg: 'authorized',
-              userId: userAppId
+              id: userAppId
             }))
           } else {
             peer.send(await utils.encryptMessage(key, {
@@ -70,7 +70,7 @@ class MockMasqApp {
                   await utils.dbReady(this.db)
                   peer.send(await utils.encryptMessage(key, {
                     msg: 'masqAccessGranted',
-                    userId: userAppId,
+                    id: userAppId,
                     key: this.db.discoveryKey.toString('hex')
                   }))
                   registered = true
