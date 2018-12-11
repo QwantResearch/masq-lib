@@ -27,7 +27,7 @@ function dbReady (db) {
 
 function dbExists (dbName) {
   return new Promise((resolve, reject) => {
-    let req = window.indexedDB.open(dbName)
+    const req = window.indexedDB.open(dbName)
     let existed = true
     req.onsuccess = () => {
       req.result.close()
