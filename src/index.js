@@ -181,6 +181,12 @@ class Masq {
     }))
   }
 
+  async _sendConnectionEstablished (key, peer) {
+    peer.send(await utils.encryptMessage(key, {
+      msg: 'connectionEstablished'
+    }))
+  }
+
   // All error handling for received messages
   _checkMessage (json, registering, waitingForWriteAccess, errorHandler) {
     let err = false
@@ -278,6 +284,7 @@ class Masq {
           if (await this._isRegistered()) {
             await this.connectToMasq()
             // logged into Masq
+            await this._sendConnectionEstablished(key, peer)
             sw.close()
             return
           }
