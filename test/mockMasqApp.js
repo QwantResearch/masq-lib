@@ -54,7 +54,7 @@ class MockMasqApp {
             }))
           } else {
             peer.send(await utils.encryptMessage(key, {
-              msg: 'notAuthorized'
+              msg: 'notRegistered'
             }))
           }
 

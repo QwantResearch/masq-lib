@@ -294,8 +294,7 @@ class Masq {
           this._requestUserAppRegister(key, peer)
           break
 
-        case 'notAuthorized':
-          // if this User-app is not registered
+        case 'notRegistered':
           registering = true
           this._requestUserAppRegister(key, peer)
           break
