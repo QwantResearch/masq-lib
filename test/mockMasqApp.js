@@ -61,6 +61,9 @@ class MockMasqApp {
           peer.on('data', async data => {
             const json = await utils.decryptMessage(key, data)
             switch (json.msg) {
+              case 'connectionEstablished':
+                sw.close()
+                break
               case 'registerUserApp':
                 if (registered) {
                   reject(Error('Already registered but received message with type "registered"'))
