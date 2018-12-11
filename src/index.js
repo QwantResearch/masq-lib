@@ -29,8 +29,6 @@ class Masq {
 
     this.userId = null
     this.userAppDb = null
-
-    this._loadSessionInfo()
   }
 
   _reset () {
