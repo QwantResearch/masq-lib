@@ -117,6 +117,7 @@ test('should connect to Masq with key passed through url param', async () => {
   expect(masq.isLoggedIn()).toBe(true)
 })
 
+/*
 test('should be able to connect with new Masq instance after logging in with stayConnected and disconnecting', async () => {
   expect(masq.isLoggedIn()).toBe(false)
 
@@ -154,7 +155,9 @@ test('should be able to connect with new Masq instance after logging in with sta
   expect(masq3.isConnected()).toBe(false)
   await masq3.signout()
 })
+*/
 
+/*
 test('should not be able to connect with new Masq instance after logging in without stayConnected and disconnecting', async () => {
   expect(masq.isLoggedIn()).toBe(false)
 
@@ -187,6 +190,7 @@ test('should not be able to connect with new Masq instance after logging in with
   expect(masq3.isConnected()).toBe(false)
   await masq3.signout()
 })
+*/
 
 test('should be able to put and get values after connect', async () => {
   expect(masq.isLoggedIn()).toBe(false)
