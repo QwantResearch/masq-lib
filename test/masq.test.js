@@ -65,7 +65,7 @@ test('should generate a pairing link', async () => {
   const uuidSize = 36
   const { link } = await masq.logIntoMasq()
   const url = new URL(link)
-  let base = config.MASQ_APP_BASE_URL
+  const base = config.MASQ_APP_BASE_URL
   expect(url.origin + url.pathname).toBe(base)
   const hashParams = getHashParams(url)
   expect(hashParams.channel).toHaveLength(uuidSize)

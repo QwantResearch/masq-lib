@@ -104,13 +104,8 @@ class Masq {
       // Subscribe to channel for a limited time to sync with masq
       debug(`Creation of a hub with ${channel} channel name`)
       const hub = signalhub(channel, config.HUB_URLS)
-      let sw = null
-
-      if (swarm.WEBRTC_SUPPORT) {
-        sw = swarm(hub)
-      } else {
-        sw = swarm(hub, { wrtc: require('wrtc') })
-      }
+      const swOpts = swarm.WEBRTC_SUPPORT ? undefined : { wrtc: require('wrtc') }
+      const sw = swarm(hub, swOpts)
 
       sw.on('peer', (peer, id) => {
         debug(`The peer ${id} join us...`)
@@ -377,7 +372,7 @@ class Masq {
    * @returns {Object}
    */
   watch (key, cb) {
-    let db = this._getDB()
+    const db = this._getDB()
     return db.watch(key, () => cb())
   }
 
@@ -387,7 +382,7 @@ class Masq {
    * @returns {Promise}
    */
   async get (key) {
-    let db = this._getDB()
+    const db = this._getDB()
     const nodes = await db.getAsync(key)
     if (!nodes.length) return nodes[0]
     return nodes[0].value
@@ -400,7 +395,7 @@ class Masq {
    * @returns {Promise}
    */
   async put (key, value) {
-    let db = this._getDB()
+    const db = this._getDB()
     return db.putAsync(key, value)
   }
 
@@ -410,7 +405,7 @@ class Masq {
    * @returns {Promise}
    */
   async del (key) {
-    let db = this._getDB()
+    const db = this._getDB()
     return db.delAsync(key)
   }
 
@@ -420,7 +415,7 @@ class Masq {
    * @returns {Promise}
    */
   async list (prefix) {
-    let db = this._getDB()
+    const db = this._getDB()
     const list = await db.listAsync(prefix)
     const reformattedDic = list.reduce((dic, e) => {
       const el = Array.isArray(e) ? e[0] : e
