@@ -190,7 +190,7 @@ class Masq {
     }
     switch (json.msg) {
       case 'authorized':
-        if (!json.id) {
+        if (!json.userAppDbId) {
           handleError('User Id not found in \'authorized\' message')
         }
         break
@@ -209,7 +209,7 @@ class Masq {
           break
         }
 
-        if (!json.id) {
+        if (!json.userAppDbId) {
           handleError('User Id not found in "masqAccessGranted" message')
         }
         break
@@ -270,9 +270,9 @@ class Masq {
       switch (json.msg) {
         case 'authorized':
           // Store the session info
-          if (stayConnected) this._storeSessionInfo(json.id)
+          if (stayConnected) this._storeSessionInfo(json.userAppDbId)
 
-          this.userId = json.id
+          this.userId = json.userAppDbId
 
           // Check if the User-app is already registered
           if (await this._isRegistered()) {
@@ -297,8 +297,8 @@ class Masq {
           registering = false
 
           // Store the session info
-          if (stayConnected) this._storeSessionInfo(json.id)
-          this.userId = json.id
+          if (stayConnected) this._storeSessionInfo(json.userAppDbId)
+          this.userId = json.userAppDbId
 
           const db = utils.createPromisifiedHyperDB(this.userId, json.key)
           this.userAppDb = db
