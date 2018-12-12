@@ -307,7 +307,8 @@ class Masq {
           if (stayConnected) this._storeSessionInfo(json.userAppDbId)
           this.userId = json.userAppDbId
 
-          const db = utils.createPromisifiedHyperDB(this.userId, json.key)
+          const buffKey = Buffer.from(json.key, 'hex')
+          const db = utils.createPromisifiedHyperDB(this.userId, buffKey)
           this.userAppDb = db
           await utils.dbReady(db)
           this._startReplication()
