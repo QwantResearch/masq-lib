@@ -7,6 +7,7 @@ window.crypto = require('@trust/webcrypto')
 const Masq = require('../src')
 const MasqAppMock = require('./mockMasqApp')
 const config = require('../config/config')
+const utils = require('../src/utils')
 
 const APP_NAME = 'app1'
 const APP_DESCRIPTION = 'A wonderful app'
@@ -18,9 +19,19 @@ jest.mock('random-access-idb', () =>
 
 jest.mock('../src/utils', () => {
   const original = require.requireActual('../src/utils')
+  let dbList = {}
   return {
     ...original,
-    dbExists: jest.fn(() => false)
+    dbExists: (name) => {
+      return Promise.resolve(!!dbList[name])
+    },
+    createPromisifiedHyperDB: (name, hexKey) => {
+      dbList[name] = 'db'
+      return original.createPromisifiedHyperDB(name, hexKey)
+    },
+    resetDbList: () => {
+      dbList = {}
+    }
   }
 })
 
@@ -46,6 +57,7 @@ afterAll((done) => {
 
 afterEach(async () => {
   await masq.signout()
+  utils.resetDbList()
 })
 
 function getHashParams (url) {
