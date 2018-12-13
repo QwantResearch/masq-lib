@@ -1,6 +1,7 @@
 const signalhub = require('signalhubws')
 const swarm = require('webrtc-swarm')
 const wrtc = require('wrtc')
+const uuidv4 = require('uuid/v4')
 const pump = require('pump')
 
 const config = require('../config/config')
@@ -66,7 +67,7 @@ class MockMasqApp {
       return new Promise(async (resolve, reject) => {
         const hub = signalhub(channel, config.HUB_URLS)
         const sw = swarm(hub, { wrtc })
-        const userAppId = 'userAppId'
+        const userAppId = 'userAppId-' + uuidv4()
 
         let key
         try {
