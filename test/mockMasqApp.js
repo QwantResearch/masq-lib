@@ -7,7 +7,7 @@ const utils = require('../src/utils')
 
 class MockMasqApp {
   constructor () {
-    this.db = null
+    this.dbs = {}
   }
 
   handleConnectionAuthorized (channel, key) {
@@ -69,12 +69,12 @@ class MockMasqApp {
                   reject(Error('Already registered but received message with type "registered"'))
                 }
                 if (registerAccepted) {
-                  this.db = utils.createPromisifiedHyperDB(userAppId)
-                  await utils.dbReady(this.db)
+                  this.dbs[userAppId] = utils.createPromisifiedHyperDB(userAppId)
+                  await utils.dbReady(this.dbs[userAppId])
                   peer.send(await utils.encryptMessage(key, {
                     msg: 'masqAccessGranted',
                     userAppDbId: userAppId,
-                    key: this.db.discoveryKey.toString('hex')
+                    key: this.dbs[userAppId].discoveryKey.toString('hex')
                   }))
                   registered = true
                 } else {
@@ -89,7 +89,7 @@ class MockMasqApp {
                   reject(Error('Expected to receive message with type "register", but received "requestWriteAccess"'))
                 }
 
-                this.db.authorizeAsync(Buffer.from(json.key, 'hex')).then(async () => {
+                this.dbs[userAppId].authorizeAsync(Buffer.from(json.key, 'hex')).then(async () => {
                   peer.send(await utils.encryptMessage(key, {
                     msg: 'writeAccessGranted'
                   }))
