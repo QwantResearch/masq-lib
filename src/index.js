@@ -29,6 +29,8 @@ class Masq {
 
     this.userId = null
     this.userAppDb = null
+
+    this._loadSessionInfo()
   }
 
   _reset () {
@@ -160,9 +162,9 @@ class Masq {
     })
   }
 
-  async _isRegistered () {
-    // is registered if the userId is the id of a known db
-    return !this.userId || utils.dbExists(this.userId)
+  async _isRegistered (userId) {
+    // is registered if there is a db for this userId
+    return utils.dbExists(userId)
   }
 
   async _requestUserAppRegister (key, peer) {
@@ -174,10 +176,10 @@ class Masq {
     }))
   }
 
-  async _requestWriteAccess (key, peer) {
-    peer.send(await utils.encryptMessage(key, {
+  async _requestWriteAccess (encryptionKey, peer, localDbKey) {
+    peer.send(await utils.encryptMessage(encryptionKey, {
       msg: 'requestWriteAccess',
-      key: this.userAppDb.local.key.toString('hex')
+      key: localDbKey.toString('hex')
     }))
   }
 
@@ -252,6 +254,9 @@ class Masq {
     let registering = false
     let waitingForWriteAccess = false
 
+    let userId
+    let db
+
     const handleData = async (sw, peer, data) => {
       const handleError = (msg) => {
         this._logIntoMasqErr = Error(msg)
@@ -275,13 +280,14 @@ class Masq {
 
       switch (json.msg) {
         case 'authorized':
-          // Store the session info
-          if (stayConnected) this._storeSessionInfo(json.userAppDbId)
-
-          this.userId = json.userAppDbId
+          userId = json.userAppDbId
 
           // Check if the User-app is already registered
-          if (await this._isRegistered()) {
+          if (await this._isRegistered(userId)) {
+            this.userId = userId
+            // Store the session info
+            if (stayConnected) this._storeSessionInfo(userId)
+
             await this.connectToMasq()
             // logged into Masq
             await this._sendConnectionEstablished(key, peer)
@@ -303,18 +309,12 @@ class Masq {
         case 'masqAccessGranted':
           registering = false
 
-          // Store the session info
-          if (stayConnected) this._storeSessionInfo(json.userAppDbId)
-          this.userId = json.userAppDbId
-
           const buffKey = Buffer.from(json.key, 'hex')
-          const db = utils.createPromisifiedHyperDB(this.userId, buffKey)
-          this.userAppDb = db
+          db = utils.createPromisifiedHyperDB(userId, buffKey)
           await utils.dbReady(db)
-          this._startReplication()
 
           waitingForWriteAccess = true
-          this._requestWriteAccess(key, peer)
+          this._requestWriteAccess(key, peer, db.local.key)
           break
 
         case 'masqAccessRefused':
@@ -324,6 +324,13 @@ class Masq {
 
         case 'writeAccessGranted':
           waitingForWriteAccess = false
+
+          // Store the session info
+          if (stayConnected) this._storeSessionInfo(userId)
+          this.userId = userId
+          this.userAppDb = db
+          this._startReplication()
+
           sw.close()
           break
       }
