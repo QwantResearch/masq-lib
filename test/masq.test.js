@@ -37,6 +37,7 @@ jest.mock('../src/utils', () => {
 
 let server = null
 let masq = null
+let mockMasqApp = null
 
 jest.setTimeout(30000)
 
@@ -55,8 +56,13 @@ afterAll((done) => {
   server.close(done)
 })
 
+beforeEach(() => {
+  mockMasqApp = new MasqAppMock()
+})
+
 afterEach(async () => {
   await masq.signout()
+  mockMasqApp.destroy()
   utils.resetDbList()
 })
 
@@ -109,14 +115,15 @@ test('should join a channel', async () => {
 })
 
 async function logInWithMasqAppMock () {
-  const masqAppMock = new MasqAppMock()
+  // stop replication if logInWithMasqAppMock has already been called
+  mockMasqApp.destroy()
 
   const { link } = await masq.logIntoMasq(true)
   const url = new URL(link)
   const hashParams = getHashParams(url)
 
   await Promise.all([
-    masqAppMock.handleConnectionAuthorized(hashParams.channel, hashParams.key),
+    mockMasqApp.handleConnectionAuthorized(hashParams.channel, hashParams.key),
     masq.logIntoMasqDone()
   ])
 }
@@ -449,15 +456,13 @@ test('should be able to login more than once without error', async () => {
 test('should be kicked if key is invalid', async () => {
   expect.assertions(2)
 
-  const masqAppMock = new MasqAppMock()
-
   const { link } = await masq.logIntoMasq()
   const url = new URL(link)
   const hashParams = getHashParams(url)
   const invalidKey = 'wrongChallenge'
   try {
     await Promise.all([
-      masqAppMock.handleConnectionAuthorized(hashParams.channel, invalidKey),
+      mockMasqApp.handleConnectionAuthorized(hashParams.channel, invalidKey),
       masq.logIntoMasqDone()
     ])
   } catch (err) {
@@ -470,8 +475,6 @@ test('should be kicked if wrong key is used', async () => {
   expect.assertions(2)
 
   try {
-    const masqAppMock = new MasqAppMock()
-
     const { link } = await masq.logIntoMasq()
     const url = new URL(link)
     const hashParams = getHashParams(url)
@@ -485,7 +488,7 @@ test('should be kicked if wrong key is used', async () => {
     )
     const extractedWrongKey = await window.crypto.subtle.exportKey('raw', wrongCryptoKey)
     await Promise.all([
-      masqAppMock.handleConnectionAuthorized(hashParams.channel, extractedWrongKey),
+      mockMasqApp.handleConnectionAuthorized(hashParams.channel, extractedWrongKey),
       masq.logIntoMasqDone()
     ])
   } catch (err) {
@@ -495,12 +498,10 @@ test('should be kicked if wrong key is used', async () => {
 })
 
 test('should fail when register is refused', async () => {
-  const masqAppMock = new MasqAppMock()
-
   const { link } = await masq.logIntoMasq()
   const url = new URL(link)
   const hashParams = getHashParams(url)
-  await masqAppMock.handleConnectionRegisterRefused(hashParams.channel, hashParams.key)
+  await mockMasqApp.handleConnectionRegisterRefused(hashParams.channel, hashParams.key)
   expect.assertions(1)
   try {
     await masq.logIntoMasqDone()

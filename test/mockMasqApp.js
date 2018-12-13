@@ -1,6 +1,7 @@
 const signalhub = require('signalhubws')
 const swarm = require('webrtc-swarm')
 const wrtc = require('wrtc')
+const pump = require('pump')
 
 const config = require('../config/config')
 const utils = require('../src/utils')
@@ -8,6 +9,44 @@ const utils = require('../src/utils')
 class MockMasqApp {
   constructor () {
     this.dbs = {}
+    this.dbsRepHub = {}
+    this.dbsRepSW = {}
+  }
+
+  destroy () {
+    Object.values(this.dbsRepSW).forEach(sw => {
+      sw.close()
+    })
+  }
+
+  _startReplication (userAppId) {
+    const discoveryKey = this.dbs[userAppId].discoveryKey.toString('hex')
+    this.dbsRepHub[userAppId] = signalhub(discoveryKey, config.HUB_URLS)
+
+    if (swarm.WEBRTC_SUPPORT) {
+      this.dbsRepSW[userAppId] = swarm(this.dbsRepHub[userAppId])
+    } else {
+      this.dbsRepSW[userAppId] = swarm(this.dbsRepHub[userAppId], { wrtc: require('wrtc') })
+    }
+
+    this.dbsRepSW[userAppId].on('peer', async (peer, id) => {
+      const stream = this.dbs[userAppId].replicate({ live: true })
+      pump(peer, stream, peer)
+    })
+  }
+
+  async get (userAppId, key) {
+    const nodes = await this.dbs[userAppId].getAsync(key)
+    if (!nodes.length) return nodes[0]
+    return nodes[0].value
+  }
+
+  async put (userAppId, key, value) {
+    return this.dbs[userAppId].putAsync(key, value)
+  }
+
+  watch (userAppId, key, cb) {
+    return this.dbs[userAppId].watch(key, () => cb())
   }
 
   handleConnectionAuthorized (channel, key) {
@@ -71,6 +110,7 @@ class MockMasqApp {
                 if (registerAccepted) {
                   this.dbs[userAppId] = utils.createPromisifiedHyperDB(userAppId)
                   await utils.dbReady(this.dbs[userAppId])
+                  this._startReplication(userAppId)
                   peer.send(await utils.encryptMessage(key, {
                     msg: 'masqAccessGranted',
                     userAppDbId: userAppId,
