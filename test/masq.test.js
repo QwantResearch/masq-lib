@@ -49,7 +49,6 @@ beforeAll(async () => {
       resolve()
     })
   })
-  masq = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL)
 })
 
 afterAll((done) => {
@@ -57,6 +56,7 @@ afterAll((done) => {
 })
 
 beforeEach(() => {
+  masq = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL)
   mockMasqApp = new MasqAppMock()
 })
 
