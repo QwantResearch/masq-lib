@@ -568,3 +568,33 @@ test('should set a watcher', async (done) => {
   masq.watch('/hello', onChange)
   await masq.put(key, value)
 })
+
+test('should be able to get a notif on change in masq-app with a watcher on masq-lib', async () => {
+  let resolvePrOnChangeMasqLib
+  const prOnChangeMasqLib = new Promise((resolve) => { resolvePrOnChangeMasqLib = resolve })
+
+  await logInWithMasqAppMock()
+  const key = '/hello'
+  const value = { data: 'world' }
+  masq.watch('/hello', resolvePrOnChangeMasqLib)
+  await mockMasqApp.put(masq.userId, key, value)
+
+  await prOnChangeMasqLib
+})
+
+test('put/get should put an item and get in Mock Masq App', async () => {
+  expect.assertions(1)
+  await logInWithMasqAppMock()
+
+  let resolvePrOnChangeMockMasqApp
+  const prOnChangeMockMasqApp = new Promise((resolve) => { resolvePrOnChangeMockMasqApp = resolve })
+  mockMasqApp.watch(masq.userId, '/hello', resolvePrOnChangeMockMasqApp)
+
+  const key = '/hello'
+  const value = { data: 'world' }
+  await masq.put(key, value)
+
+  await prOnChangeMockMasqApp
+  const res = await mockMasqApp.get(masq.userId, '/hello')
+  expect(res).toEqual(value)
+})
