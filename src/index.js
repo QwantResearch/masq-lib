@@ -89,14 +89,31 @@ class Masq {
 
   _deleteSessionInfo () {
     window.localStorage.removeItem('userId')
+    window.sessionStorage.removeItem('userId')
   }
 
-  _storeSessionInfo (userId) {
-    window.localStorage.setItem('userId', userId)
+  _storeSessionInfo (stayConnected, userId) {
+    if (stayConnected) {
+      window.localStorage.setItem('userId', userId)
+    }
+    window.sessionStorage.setItem('userId', userId)
   }
 
   _loadSessionInfo () {
-    this.userId = window.localStorage.getItem('userId')
+    // If userId is in sesssion storage, use it and do not touch localStorage
+    const sessionUserId = window.sessionStorage.getItem('userId')
+    if (sessionUserId) {
+      this.userId = sessionUserId
+      return
+    }
+
+    // if userId is is not in session storage, look for it in local storage
+    // and save in session storage
+    const localStorageUserId = window.localStorage.getItem('userId')
+    if (localStorageUserId) {
+      this.userId = localStorageUserId
+      window.sessionStorage.setItem('userId', this.userId)
+    }
   }
 
   async _initSwarmWithDataHandler (channel, dataHandler) {
@@ -286,7 +303,7 @@ class Masq {
           if (await this._isRegistered(userId)) {
             this.userId = userId
             // Store the session info
-            if (stayConnected) this._storeSessionInfo(userId)
+            this._storeSessionInfo(stayConnected, userId)
 
             await this.connectToMasq()
             // logged into Masq
@@ -326,7 +343,7 @@ class Masq {
           waitingForWriteAccess = false
 
           // Store the session info
-          if (stayConnected) this._storeSessionInfo(userId)
+          this._storeSessionInfo(stayConnected, userId)
           this.userId = userId
           this.userAppDb = db
           this._startReplication()
