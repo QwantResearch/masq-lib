@@ -98,19 +98,19 @@ async function logInWithMasqAppMock (stayConnected) {
   // stop replication if logInWithMasqAppMock has already been called
   mockMasqApp.destroy()
 
-  const { link } = await masq.logIntoMasq(stayConnected)
+  const link = await masq.getLoginLink()
   const hashParams = common.utils.getHashParams(link)
 
   await Promise.all([
     mockMasqApp.handleConnectionAuthorized(hashParams.channel, hashParams.key),
-    masq.logIntoMasqDone()
+    masq.logIntoMasq(stayConnected)
   ])
 }
 
 describe('Test login procedure', () => {
   test('should generate a pairing link', async () => {
     const uuidSize = 36
-    const { link } = await masq.logIntoMasq()
+    const link = await masq.getLoginLink()
     const url = new URL(link)
     const base = config.MASQ_APP_BASE_URL
     expect(url.origin + url.pathname).toBe(base)
@@ -122,7 +122,7 @@ describe('Test login procedure', () => {
     expect.assertions(1)
 
     const pr = new Promise(async (resolve, reject) => {
-      const { link } = await masq.logIntoMasq()
+      const link = await masq.getLoginLink()
       const hashParams = common.utils.getHashParams(link)
 
       // simulating masq app
@@ -138,8 +138,7 @@ describe('Test login procedure', () => {
         resolve()
       })
     })
-    await pr
-    await masq.logIntoMasqDone()
+    await Promise.all([pr, masq.logIntoMasq(false)])
   })
 
   test('should connect to Masq with key passed through url param', async () => {
@@ -214,11 +213,11 @@ describe('Test login procedure', () => {
 
     // connect with masq2
     mockMasqApp.destroy()
-    const { link } = await masq2.logIntoMasq(false)
+    const link = await masq2.getLoginLink()
     const hashParams = common.utils.getHashParams(link)
     await Promise.all([
       mockMasqApp.handleConnectionAuthorized(hashParams.channel, hashParams.key),
-      masq2.logIntoMasqDone()
+      masq2.logIntoMasq(false)
     ])
 
     expect(masq2.isLoggedIn()).toBe(true)
@@ -485,13 +484,13 @@ describe('Test login procedure', () => {
   test('should be kicked if key is invalid', async () => {
     expect.assertions(2)
 
-    const { link } = await masq.logIntoMasq()
+    const link = await masq.getLoginLink()
     const hashParams = common.utils.getHashParams(link)
     const invalidKey = 'wrongChallenge'
     try {
       await Promise.all([
         mockMasqApp.handleConnectionAuthorized(hashParams.channel, invalidKey),
-        masq.logIntoMasqDone()
+        masq.logIntoMasq(false)
       ])
     } catch (err) {
       expect(err).toBeDefined()
@@ -503,13 +502,13 @@ describe('Test login procedure', () => {
     expect.assertions(2)
 
     try {
-      const { link } = await masq.logIntoMasq()
+      const link = await masq.getLoginLink()
       const hashParams = common.utils.getHashParams(link)
       // Extracted raw key is only a BUffer of bytes.
       let extractedWrongKey = Buffer.from(common.crypto.genRandomBuffer(16))
       await Promise.all([
         mockMasqApp.handleConnectionAuthorized(hashParams.channel, extractedWrongKey),
-        masq.logIntoMasqDone()
+        masq.logIntoMasq(false)
       ])
     } catch (err) {
       expect(err).toBeDefined()
@@ -518,12 +517,14 @@ describe('Test login procedure', () => {
   })
 
   test('should fail when register is refused', async () => {
-    const { link } = await masq.logIntoMasq()
+    const link = await masq.getLoginLink()
     const hashParams = common.utils.getHashParams(link)
-    await mockMasqApp.handleConnectionRegisterRefused(hashParams.channel, hashParams.key)
     expect.assertions(1)
     try {
-      await masq.logIntoMasqDone()
+      await Promise.all([
+        mockMasqApp.handleConnectionRegisterRefused(hashParams.channel, hashParams.key),
+        masq.logIntoMasq(false)
+      ])
     } catch (e) {
       expect(e.message).toBe('Masq access refused by the user')
     }

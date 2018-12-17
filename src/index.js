@@ -30,6 +30,11 @@ class Masq {
     this.userAppDb = null
 
     this._loadSessionInfo()
+
+    // login state data
+    this.loginChannel = null
+    this.loginKey = null
+    this.loginUrl = null
   }
 
   _reset () {
@@ -142,23 +147,6 @@ class Masq {
     })
   }
 
-  async _genConnectionMaterial () {
-    const channel = uuidv4()
-    const key = await common.crypto.genAESKey(true, 'AES-GCM', 128)
-    const extractedKey = await common.crypto.exportKey(key)
-    const keyBase64 = Buffer.from(extractedKey).toString('base64')
-    const myUrl = new URL(config.MASQ_APP_BASE_URL)
-    const requestType = 'login'
-    const hashParams = JSON.stringify([this.appName, requestType, channel, keyBase64])
-    myUrl.hash = '/' + Buffer.from(hashParams).toString('base64')
-
-    return {
-      link: myUrl.href,
-      channel,
-      key
-    }
-  }
-
   _startReplication () {
     const discoveryKey = this.userAppDb.discoveryKey.toString('hex')
     this.userAppRepHub = signalhub(discoveryKey, config.HUB_URLS)
@@ -262,6 +250,19 @@ class Masq {
     return err
   }
 
+  async getLoginLink () {
+    this.loginChannel = uuidv4()
+    this.loginKey = await common.crypto.genAESKey(true, 'AES-GCM', 128)
+    const extractedKey = await common.crypto.exportKey(this.loginKey)
+    const keyBase64 = Buffer.from(extractedKey).toString('base64')
+    this.loginUrl = new URL(config.MASQ_APP_BASE_URL)
+    const requestType = 'login'
+    const hashParams = JSON.stringify([this.appName, requestType, this.loginChannel, keyBase64])
+    this.loginUrl.hash = '/' + Buffer.from(hashParams).toString('base64')
+
+    return this.loginUrl.href
+  }
+
   /**
    * If this is the first time, this.dbs.profiles is empty.
    * We need to get masq-profiles hyperdb key of masq.
@@ -277,8 +278,10 @@ class Masq {
     // make stayConnected a boolean
     stayConnected = !!stayConnected
 
-    // generation of link with new channel and key for the sync of new peer
-    const { link, channel, key } = await this._genConnectionMaterial()
+    // get login channel and key created at login link generation
+    const channel = this.loginChannel
+    const key = this.loginKey
+
     let registering = false
     let waitingForWriteAccess = false
 
@@ -371,12 +374,6 @@ class Masq {
       }
     )
 
-    return {
-      link
-    }
-  }
-
-  logIntoMasqDone () {
     return new Promise((resolve, reject) => {
       if (this._logIntoMasqDone) {
         this._logIntoMasqDone = false
