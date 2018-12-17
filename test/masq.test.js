@@ -8,7 +8,6 @@ const common = require('../node_modules/masq-common/dist/index')
 const Masq = require('../src')
 const MasqAppMock = require('./mockMasqApp')
 const config = require('../config/config')
-const utils = require('../src/utils')
 
 const APP_NAME = 'app1'
 const APP_DESCRIPTION = 'A wonderful app'
@@ -20,22 +19,22 @@ const APP_IMAGE_URL = ' a link to image'
 jest.mock('random-access-idb', () =>
   () => require('random-access-memory'))
 
-jest.mock('../src/utils', () => {
-  const original = require.requireActual('../src/utils')
+jest.mock('../node_modules/masq-common/dist/index', () => {
+  const original = require.requireActual('../node_modules/masq-common/dist/index')
   let dbList = {}
-  return {
-    ...original,
-    dbExists: (name) => {
-      return Promise.resolve(!!dbList[name])
-    },
-    createPromisifiedHyperDB: (name, hexKey) => {
-      dbList[name] = 'db'
-      return original.createPromisifiedHyperDB(name, hexKey)
-    },
-    resetDbList: () => {
-      dbList = {}
-    }
+  let originalCreate = original.utils.createPromisifiedHyperDB
+  let modified = { ...original }
+  modified.utils.dbExists = (name) => {
+    return Promise.resolve(!!dbList[name])
   }
+  modified.utils.createPromisifiedHyperDB = (name, hexKey) => {
+    dbList[name] = 'db'
+    return originalCreate(name, hexKey)
+  }
+  modified.utils.resetDbList = () => {
+    dbList = {}
+  }
+  return modified
 })
 
 let server = null
@@ -66,18 +65,22 @@ beforeEach(() => {
 afterEach(async () => {
   await masq.signout()
   mockMasqApp.destroy()
-  utils.resetDbList()
+  common.utils.resetDbList()
 })
 
 describe('Test mock functions', () => {
   test('dbExists should work as expected', async () => {
-    expect(await utils.dbExists('db1')).toBe(false)
-    await utils.createPromisifiedHyperDB('db1')
-    expect(await utils.dbExists('db1')).toBe(true)
-    utils.resetDbList()
-    expect(await utils.dbExists('db1')).toBe(false)
-    await utils.createPromisifiedHyperDB('db1')
-    expect(await utils.dbExists('db1')).toBe(true)
+    expect(await common.utils.dbExists('db1')).toBe(false)
+    try {
+      await common.utils.createPromisifiedHyperDB('db1')
+      expect(await common.utils.dbExists('db1')).toBe(true)
+    } catch (error) {
+      console.log(error)
+    }
+    common.utils.resetDbList()
+    expect(await common.utils.dbExists('db1')).toBe(false)
+    await common.utils.createPromisifiedHyperDB('db1')
+    expect(await common.utils.dbExists('db1')).toBe(true)
   })
 })
 

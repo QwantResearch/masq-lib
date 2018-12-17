@@ -6,7 +6,6 @@ const pump = require('pump')
 const common = require('../node_modules/masq-common/dist/index')
 
 const config = require('../config/config')
-const utils = require('../src/utils')
 
 class MockMasqApp {
   constructor () {
@@ -108,7 +107,7 @@ class MockMasqApp {
                   reject(Error('Already registered but received message with type "registered"'))
                 }
                 if (registerAccepted) {
-                  this.dbs[userAppId] = utils.createPromisifiedHyperDB(userAppId)
+                  this.dbs[userAppId] = common.utils.createPromisifiedHyperDB(userAppId)
                   await common.utils.dbReady(this.dbs[userAppId])
                   this._startReplication(userAppId)
                   const msg = {

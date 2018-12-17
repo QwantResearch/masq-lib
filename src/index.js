@@ -3,8 +3,6 @@ const signalhub = require('signalhubws')
 const uuidv4 = require('uuid/v4')
 const pump = require('pump')
 const common = require('../node_modules/masq-common/dist/index')
-
-const utils = require('./utils')
 const config = require('../config/config')
 
 const debug = (function () {
@@ -57,7 +55,7 @@ class Masq {
       throw Error('Not logged into Masq')
     }
 
-    const db = utils.createPromisifiedHyperDB(this.userId)
+    const db = common.utils.createPromisifiedHyperDB(this.userId)
     this.userAppDb = db
     await common.utils.dbReady(db)
     this._startReplication()
@@ -156,7 +154,7 @@ class Masq {
 
   async _isRegistered () {
     // is registered if the userId is the id of a known db
-    return !this.userId || utils.dbExists(this.userId)
+    return !this.userId || common.utils.dbExists(this.userId)
   }
 
   async _requestUserAppRegister (key, peer) {
@@ -309,7 +307,7 @@ class Masq {
           this.userId = json.userAppDbId
 
           const buffKey = Buffer.from(json.key, 'hex')
-          const db = utils.createPromisifiedHyperDB(this.userId, buffKey)
+          const db = common.utils.createPromisifiedHyperDB(this.userId, buffKey)
           this.userAppDb = db
           await common.utils.dbReady(db)
           this._startReplication()
