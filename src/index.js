@@ -2,6 +2,7 @@ const swarm = require('webrtc-swarm')
 const signalhub = require('signalhubws')
 const uuidv4 = require('uuid/v4')
 const pump = require('pump')
+const common = require('../node_modules/masq-common/dist/index')
 
 const utils = require('./utils')
 const config = require('../config/config')
@@ -122,15 +123,8 @@ class Masq {
 
   async _genConnectionMaterial () {
     const channel = uuidv4()
-    const key = await window.crypto.subtle.generateKey(
-      {
-        name: 'AES-GCM',
-        length: 128
-      },
-      true, // whether the key is extractable (i.e. can be used in exportKey)
-      ['encrypt', 'decrypt'] // can 'encrypt', 'decrypt', 'wrapKey', or 'unwrapKey'
-    )
-    const extractedKey = await window.crypto.subtle.exportKey('raw', key)
+    const key = await common.crypto.genAESKey(true, 'AES-GCM', 128)
+    const extractedKey = await common.crypto.exportKey(key)
     const keyBase64 = Buffer.from(extractedKey).toString('base64')
     const myUrl = new URL(config.MASQ_APP_BASE_URL)
     const requestType = 'login'

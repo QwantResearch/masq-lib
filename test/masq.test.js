@@ -3,6 +3,7 @@ const signalhub = require('signalhubws')
 const swarm = require('webrtc-swarm')
 const wrtc = require('wrtc')
 window.crypto = require('@trust/webcrypto')
+// const common = require('../node_modules/masq-common/dist/index')
 
 const Masq = require('../src')
 const MasqAppMock = require('./mockMasqApp')
@@ -12,6 +13,8 @@ const utils = require('../src/utils')
 const APP_NAME = 'app1'
 const APP_DESCRIPTION = 'A wonderful app'
 const APP_IMAGE_URL = ' a link to image'
+
+// console.log(common)
 
 // user an in memory random-access-storage instead
 jest.mock('random-access-idb', () =>
