@@ -262,8 +262,7 @@ class Masq {
       // decrypt the received message and check if the right key has been used
       let json
       try {
-        let decryptedMsg = await common.crypto.decrypt(key, JSON.parse(data), 'base64')
-        json = decryptedMsg
+        json = await common.crypto.decrypt(key, JSON.parse(data), 'base64')
       } catch (err) {
         if (err.message === 'Unsupported state or unable to authenticate data') {
           handleError('Unable to read the message with the key sent to Masq-app')
