@@ -265,6 +265,11 @@ class Masq {
    *  link - the link to open the masq app with the right
    */
   async logIntoMasq (stayConnected) {
+    // logout if loggedin when called
+    if (this.userId) {
+      this.signout()
+    }
+
     // generation of link with new channel and key for the sync of new peer
     const { link, channel, key } = await this._genConnectionMaterial()
     let registering = false
