@@ -12,8 +12,7 @@ const config = require('../config/config')
 const APP_NAME = 'app1'
 const APP_DESCRIPTION = 'A wonderful app'
 const APP_IMAGE_URL = ' a link to image'
-
-// console.log(common)
+console.log(common)
 
 // user an in memory random-access-storage instead
 jest.mock('random-access-idb', () =>
