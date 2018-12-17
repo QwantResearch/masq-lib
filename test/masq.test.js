@@ -3,7 +3,7 @@ const signalhub = require('signalhubws')
 const swarm = require('webrtc-swarm')
 const wrtc = require('wrtc')
 window.crypto = require('@trust/webcrypto')
-// const common = require('../node_modules/masq-common/dist/index')
+const common = require('../node_modules/masq-common/dist/index')
 
 const Masq = require('../src')
 const MasqAppMock = require('./mockMasqApp')
@@ -494,15 +494,8 @@ describe('Test login procedure', () => {
       const { link } = await masq.logIntoMasq()
       const url = new URL(link)
       const hashParams = getHashParams(url)
-      const wrongCryptoKey = await window.crypto.subtle.generateKey(
-        {
-          name: 'AES-GCM',
-          length: 128
-        },
-        true,
-        ['encrypt', 'decrypt']
-      )
-      const extractedWrongKey = await window.crypto.subtle.exportKey('raw', wrongCryptoKey)
+      // Extracted raw key is only a BUffer of bytes.
+      let extractedWrongKey = Buffer.from(common.crypto.genRandomBuffer(16))
       await Promise.all([
         mockMasqApp.handleConnectionAuthorized(hashParams.channel, extractedWrongKey),
         masq.logIntoMasqDone()
