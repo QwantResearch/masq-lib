@@ -72,13 +72,7 @@ class MockMasqApp {
 
         let key
         try {
-          key = await window.crypto.subtle.importKey(
-            'raw',
-            rawKey,
-            { name: 'AES-GCM' },
-            false,
-            ['encrypt', 'decrypt']
-          )
+          key = await common.crypto.importKey(rawKey)
         } catch (err) {
           sw.close()
           return reject(Error('Invalid Key'))
