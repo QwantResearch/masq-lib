@@ -3,6 +3,7 @@ const swarm = require('webrtc-swarm')
 const wrtc = require('wrtc')
 const uuidv4 = require('uuid/v4')
 const pump = require('pump')
+// const common = require('../node_modules/masq-common/dist/index')
 
 const config = require('../config/config')
 const utils = require('../src/utils')

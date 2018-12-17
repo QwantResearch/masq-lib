@@ -65,7 +65,7 @@ async function encryptMessage (key, data) {
   const encryptedBase64 = Buffer.from(encrypted).toString('base64')
   const ivBase64 = Buffer.from(iv).toString('base64')
   return JSON.stringify({
-    encrypted: encryptedBase64,
+    ciphertext: encryptedBase64,
     iv: ivBase64
   })
 }
@@ -73,7 +73,7 @@ async function encryptMessage (key, data) {
 async function decryptMessage (key, data) {
   const encryptedJson = JSON.parse(data)
   const iv = Buffer.from(encryptedJson.iv, 'base64')
-  const encryptedData = Buffer.from(encryptedJson.encrypted, 'base64')
+  const encryptedData = Buffer.from(encryptedJson.ciphertext, 'base64')
   const decryptedData = await window.crypto.subtle.decrypt(
     {
       name: 'AES-GCM',

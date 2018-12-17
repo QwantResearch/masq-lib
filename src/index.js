@@ -160,25 +160,32 @@ class Masq {
   }
 
   async _requestUserAppRegister (key, peer) {
-    peer.send(await utils.encryptMessage(key, {
+    const msg = {
       msg: 'registerUserApp',
       name: this.appName,
       description: this.appDescription,
       imageURL: this.appImageURL
-    }))
+    }
+    let encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
+    peer.send(JSON.stringify(encryptedMsg))
   }
 
   async _requestWriteAccess (key, peer) {
-    peer.send(await utils.encryptMessage(key, {
+    const msg = {
       msg: 'requestWriteAccess',
       key: this.userAppDb.local.key.toString('hex')
-    }))
+    }
+    const encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
+    peer.send(JSON.stringify(encryptedMsg))
   }
 
   async _sendConnectionEstablished (key, peer) {
-    peer.send(await utils.encryptMessage(key, {
+    const msg = {
       msg: 'connectionEstablished'
-    }))
+    }
+    const encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
+
+    peer.send(JSON.stringify(encryptedMsg))
   }
 
   // All error handling for received messages
@@ -255,7 +262,8 @@ class Masq {
       // decrypt the received message and check if the right key has been used
       let json
       try {
-        json = await utils.decryptMessage(key, data)
+        let decryptedMsg = await common.crypto.decrypt(key, JSON.parse(data), 'base64')
+        json = decryptedMsg
       } catch (err) {
         if (err.message === 'Unsupported state or unable to authenticate data') {
           handleError('Unable to read the message with the key sent to Masq-app')
