@@ -109,7 +109,7 @@ class MockMasqApp {
                 }
                 if (registerAccepted) {
                   this.dbs[userAppId] = utils.createPromisifiedHyperDB(userAppId)
-                  await utils.dbReady(this.dbs[userAppId])
+                  await common.utils.dbReady(this.dbs[userAppId])
                   this._startReplication(userAppId)
                   const msg = {
                     msg: 'masqAccessGranted',

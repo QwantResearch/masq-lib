@@ -59,7 +59,7 @@ class Masq {
 
     const db = utils.createPromisifiedHyperDB(this.userId)
     this.userAppDb = db
-    await utils.dbReady(db)
+    await common.utils.dbReady(db)
     this._startReplication()
   }
 
@@ -311,7 +311,7 @@ class Masq {
           const buffKey = Buffer.from(json.key, 'hex')
           const db = utils.createPromisifiedHyperDB(this.userId, buffKey)
           this.userAppDb = db
-          await utils.dbReady(db)
+          await common.utils.dbReady(db)
           this._startReplication()
 
           waitingForWriteAccess = true
