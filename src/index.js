@@ -28,6 +28,8 @@ class Masq {
 
     this.userId = null
     this.userAppDb = null
+
+    this._loadSessionInfo()
   }
 
   _reset () {
@@ -86,14 +88,31 @@ class Masq {
 
   _deleteSessionInfo () {
     window.localStorage.removeItem('userId')
+    window.sessionStorage.removeItem('userId')
   }
 
-  _storeSessionInfo (userId) {
-    window.localStorage.setItem('userId', userId)
+  _storeSessionInfo (stayConnected, userId) {
+    if (stayConnected) {
+      window.localStorage.setItem('userId', userId)
+    }
+    window.sessionStorage.setItem('userId', userId)
   }
 
   _loadSessionInfo () {
-    this.userId = window.localStorage.getItem('userId')
+    // If userId is in sesssion storage, use it and do not touch localStorage
+    const sessionUserId = window.sessionStorage.getItem('userId')
+    if (sessionUserId) {
+      this.userId = sessionUserId
+      return
+    }
+
+    // if userId is is not in session storage, look for it in local storage
+    // and save in session storage
+    const localStorageUserId = window.localStorage.getItem('userId')
+    if (localStorageUserId) {
+      this.userId = localStorageUserId
+      window.sessionStorage.setItem('userId', this.userId)
+    }
   }
 
   async _initSwarmWithDataHandler (channel, dataHandler) {
@@ -152,9 +171,10 @@ class Masq {
     })
   }
 
-  async _isRegistered () {
-    // is registered if the userId is the id of a known db
-    return !this.userId || common.utils.dbExists(this.userId)
+  async _isRegistered (userId) {
+    // is registered if there is a db for this userId
+    return common.utils.dbExists(userId)
+
   }
 
   async _requestUserAppRegister (key, peer) {
@@ -168,13 +188,13 @@ class Masq {
     peer.send(JSON.stringify(encryptedMsg))
   }
 
-  async _requestWriteAccess (key, peer) {
+  async _requestWriteAccess (encryptionKey, peer,localDbKey) {
     const msg = {
       msg: 'requestWriteAccess',
-      key: this.userAppDb.local.key.toString('hex')
+      key: localDbKey.toString('hex')
     }
-    const encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
-    peer.send(JSON.stringify(encryptedMsg))
+    const encryptedMsg = await common.crypto.encrypt(encryptionKey, msg, 'base64')
+    peer.send(JSON.stringify(encryptedMsg)
   }
 
   async _sendConnectionEstablished (key, peer) {
@@ -251,6 +271,9 @@ class Masq {
     let registering = false
     let waitingForWriteAccess = false
 
+    let userId
+    let db
+
     const handleData = async (sw, peer, data) => {
       const handleError = (msg) => {
         this._logIntoMasqErr = Error(msg)
@@ -274,13 +297,14 @@ class Masq {
 
       switch (json.msg) {
         case 'authorized':
-          // Store the session info
-          if (stayConnected) this._storeSessionInfo(json.userAppDbId)
-
-          this.userId = json.userAppDbId
+          userId = json.userAppDbId
 
           // Check if the User-app is already registered
-          if (await this._isRegistered()) {
+          if (await this._isRegistered(userId)) {
+            this.userId = userId
+            // Store the session info
+            this._storeSessionInfo(stayConnected, userId)
+
             await this.connectToMasq()
             // logged into Masq
             await this._sendConnectionEstablished(key, peer)
@@ -302,18 +326,13 @@ class Masq {
         case 'masqAccessGranted':
           registering = false
 
-          // Store the session info
-          if (stayConnected) this._storeSessionInfo(json.userAppDbId)
-          this.userId = json.userAppDbId
-
           const buffKey = Buffer.from(json.key, 'hex')
-          const db = common.utils.createPromisifiedHyperDB(this.userId, buffKey)
-          this.userAppDb = db
+          db = common.utils.createPromisifiedHyperDB(userId, buffKey)
           await common.utils.dbReady(db)
-          this._startReplication()
+
 
           waitingForWriteAccess = true
-          this._requestWriteAccess(key, peer)
+          this._requestWriteAccess(key, peer, db.local.key)
           break
 
         case 'masqAccessRefused':
@@ -323,6 +342,13 @@ class Masq {
 
         case 'writeAccessGranted':
           waitingForWriteAccess = false
+
+          // Store the session info
+          this._storeSessionInfo(stayConnected, userId)
+          this.userId = userId
+          this.userAppDb = db
+          this._startReplication()
+
           sw.close()
           break
       }
