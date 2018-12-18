@@ -174,7 +174,6 @@ class Masq {
   async _isRegistered (userId) {
     // is registered if there is a db for this userId
     return common.utils.dbExists(userId)
-
   }
 
   async _requestUserAppRegister (key, peer) {
@@ -188,13 +187,13 @@ class Masq {
     peer.send(JSON.stringify(encryptedMsg))
   }
 
-  async _requestWriteAccess (encryptionKey, peer,localDbKey) {
+  async _requestWriteAccess (encryptionKey, peer, localDbKey) {
     const msg = {
       msg: 'requestWriteAccess',
       key: localDbKey.toString('hex')
     }
     const encryptedMsg = await common.crypto.encrypt(encryptionKey, msg, 'base64')
-    peer.send(JSON.stringify(encryptedMsg)
+    peer.send(JSON.stringify(encryptedMsg))
   }
 
   async _sendConnectionEstablished (key, peer) {
@@ -329,7 +328,6 @@ class Masq {
           const buffKey = Buffer.from(json.key, 'hex')
           db = common.utils.createPromisifiedHyperDB(userId, buffKey)
           await common.utils.dbReady(db)
-
 
           waitingForWriteAccess = true
           this._requestWriteAccess(key, peer, db.local.key)
