@@ -32,10 +32,12 @@ const masq = new Masq(
 if (masq.isLoggedIn()) {
     await masq.connectToMasq()
 } else {
-    const stayConnected = false
-    const { link } = await masq.logIntoMasq(stayConnected)
+    const link = await masq.getLoginLink()
     // Display link to the user
-    await masq.logIntoMasqDone()
+    // and ask if he wants to stay connected on restart until he signs out
+    const stayConnected = false
+    // Once the link is opened, execute the following code
+    await masq.logIntoMasq(stayConnected)
 
     await masq.put('someKey', 'someValue')
     const val = await masq.get('someKey')
@@ -69,25 +71,23 @@ The User data is synced between the different connected devices only when the Us
 #### `masq.connectToMasq() -> Promise<void>`
 
 Connects to Masq if a User is already logged into Masq.
-The data will then be synced between the different connected devices of the User
+The data will then be synced between the different connected devices of the User.
 
 #### `masq.signout() -> Promise<void>`
 
 Signs out of Masq from Masq.
 This also means the User-app data on the device will stop being synced.
 
-#### `masq.logIntoMasq(stayConnected) -> Promise<ret: object>`
+### `masq.getLoginLink() -> Promise<link: string>`
 
-`stayConnected` is a boolean representing if the User should stay connected until he explicitely signs out.
+The function returns a Promise resolving to an Url which must be opened by the user in order to connect to Masq.
 
-The function returns an object containing an attribute `link` containing the Url the user has to access to connect to Masq.
+#### `masq.logIntoMasq(stayConnected) -> Promise<void>`
 
-Starts the login procedure with Masq and returns a link.
-Once the user access the link and connects to his profile, the login will end, this can be checked with the `masq.logIntoMasqDone()`.
+`stayConnected` is a boolean representing if the User should stay connected until he explicitely signs out or only until he closes the User-app.
 
-#### `masq.logIntoMasqDone() -> Promise<void>`
-
-Returns a promise that resolves when the login procedure ends.
+This function starts the login procedure with an instance of Masq-app
+Once the user accesses the link and connects to his profile, the login will end and the returned promise will resolve.
 
 #### `masq.get(key) -> Promise<string>`
 
