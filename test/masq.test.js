@@ -3,7 +3,7 @@ const signalhub = require('signalhubws')
 const swarm = require('webrtc-swarm')
 const wrtc = require('wrtc')
 window.crypto = require('@trust/webcrypto')
-const common = require('../node_modules/masq-common/dist/index')
+const common = require('masq-common/dist')
 
 const Masq = require('../src')
 const MasqAppMock = require('./mockMasqApp')
@@ -18,8 +18,8 @@ console.log(common)
 jest.mock('random-access-idb', () =>
   () => require('random-access-memory'))
 
-jest.mock('../node_modules/masq-common/dist/index', () => {
-  const original = require.requireActual('../node_modules/masq-common/dist/index')
+jest.mock('masq-common/dist', () => {
+  const original = require.requireActual('masq-common/dist')
   let dbList = {}
   let originalCreate = original.utils.createPromisifiedHyperDB
   let modified = { ...original }
