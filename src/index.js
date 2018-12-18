@@ -2,7 +2,7 @@ const swarm = require('webrtc-swarm')
 const signalhub = require('signalhubws')
 const uuidv4 = require('uuid/v4')
 const pump = require('pump')
-const common = require('masq-common/dist')
+const common = require('masq-common')
 const config = require('../config/config')
 
 const debug = (function () {
