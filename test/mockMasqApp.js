@@ -3,9 +3,9 @@ const swarm = require('webrtc-swarm')
 const wrtc = require('wrtc')
 const uuidv4 = require('uuid/v4')
 const pump = require('pump')
+const common = require('masq-common')
 
 const config = require('../config/config')
-const utils = require('../src/utils')
 
 class MockMasqApp {
   constructor () {
@@ -71,13 +71,7 @@ class MockMasqApp {
 
         let key
         try {
-          key = await window.crypto.subtle.importKey(
-            'raw',
-            rawKey,
-            { name: 'AES-GCM' },
-            false,
-            ['encrypt', 'decrypt']
-          )
+          key = await common.crypto.importKey(rawKey)
         } catch (err) {
           sw.close()
           return reject(Error('Invalid Key'))
@@ -88,18 +82,22 @@ class MockMasqApp {
         sw.on('peer', async (peer, id) => {
           // Send authorize or not
           if (authorized) {
-            peer.send(await utils.encryptMessage(key, {
+            const msg = {
               msg: 'authorized',
               userAppDbId: userAppId
-            }))
+            }
+            const encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
+            peer.send(JSON.stringify(encryptedMsg))
           } else {
-            peer.send(await utils.encryptMessage(key, {
+            const msg = {
               msg: 'notAuthorized'
-            }))
+            }
+            const encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
+            peer.send(JSON.stringify(encryptedMsg))
           }
 
           peer.on('data', async data => {
-            const json = await utils.decryptMessage(key, data)
+            const json = await common.crypto.decrypt(key, JSON.parse(data), 'base64')
             switch (json.msg) {
               case 'connectionEstablished':
                 sw.close()
@@ -109,19 +107,23 @@ class MockMasqApp {
                   reject(Error('Already registered but received message with type "registered"'))
                 }
                 if (registerAccepted) {
-                  this.dbs[userAppId] = utils.createPromisifiedHyperDB(userAppId)
-                  await utils.dbReady(this.dbs[userAppId])
+                  this.dbs[userAppId] = common.utils.createPromisifiedHyperDB(userAppId)
+                  await common.utils.dbReady(this.dbs[userAppId])
                   this._startReplication(userAppId)
-                  peer.send(await utils.encryptMessage(key, {
+                  const msg = {
                     msg: 'masqAccessGranted',
                     userAppDbId: userAppId,
                     key: this.dbs[userAppId].key.toString('hex')
-                  }))
+                  }
+                  const encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
+                  peer.send(JSON.stringify(encryptedMsg))
                   registered = true
                 } else {
-                  peer.send(await utils.encryptMessage(key, {
+                  const msg = {
                     msg: 'masqAccessRefused'
-                  }))
+                  }
+                  const encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
+                  peer.send(JSON.stringify(encryptedMsg))
                   sw.close()
                 }
                 break
@@ -131,9 +133,11 @@ class MockMasqApp {
                 }
 
                 this.dbs[userAppId].authorizeAsync(Buffer.from(json.key, 'hex')).then(async () => {
-                  peer.send(await utils.encryptMessage(key, {
+                  const msg = {
                     msg: 'writeAccessGranted'
-                  }))
+                  }
+                  const encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
+                  peer.send(JSON.stringify(encryptedMsg))
                   sw.close()
                 })
 

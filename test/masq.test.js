@@ -3,11 +3,11 @@ const signalhub = require('signalhubws')
 const swarm = require('webrtc-swarm')
 const wrtc = require('wrtc')
 window.crypto = require('@trust/webcrypto')
+const common = require('masq-common')
 
 const Masq = require('../src')
 const MasqAppMock = require('./mockMasqApp')
 const config = require('../config/config')
-const utils = require('../src/utils')
 
 const APP_NAME = 'app1'
 const APP_DESCRIPTION = 'A wonderful app'
@@ -17,22 +17,22 @@ const APP_IMAGE_URL = ' a link to image'
 jest.mock('random-access-idb', () =>
   () => require('random-access-memory'))
 
-jest.mock('../src/utils', () => {
-  const original = require.requireActual('../src/utils')
+jest.mock('masq-common', () => {
+  const original = require.requireActual('masq-common')
   let dbList = {}
-  return {
-    ...original,
-    dbExists: (name) => {
-      return Promise.resolve(!!dbList[name])
-    },
-    createPromisifiedHyperDB: (name, hexKey) => {
-      dbList[name] = 'db'
-      return original.createPromisifiedHyperDB(name, hexKey)
-    },
-    resetDbList: () => {
-      dbList = {}
-    }
+  let originalCreate = original.utils.createPromisifiedHyperDB
+  let modified = { ...original }
+  modified.utils.dbExists = (name) => {
+    return Promise.resolve(!!dbList[name])
   }
+  modified.utils.createPromisifiedHyperDB = (name, hexKey) => {
+    dbList[name] = 'db'
+    return originalCreate(name, hexKey)
+  }
+  modified.utils.resetDbList = () => {
+    dbList = {}
+  }
+  return modified
 })
 
 let server = null
@@ -63,18 +63,22 @@ beforeEach(() => {
 afterEach(async () => {
   await masq.signout()
   mockMasqApp.destroy()
-  utils.resetDbList()
+  common.utils.resetDbList()
 })
 
 describe('Test mock functions', () => {
   test('dbExists should work as expected', async () => {
-    expect(await utils.dbExists('db1')).toBe(false)
-    await utils.createPromisifiedHyperDB('db1')
-    expect(await utils.dbExists('db1')).toBe(true)
-    utils.resetDbList()
-    expect(await utils.dbExists('db1')).toBe(false)
-    await utils.createPromisifiedHyperDB('db1')
-    expect(await utils.dbExists('db1')).toBe(true)
+    expect(await common.utils.dbExists('db1')).toBe(false)
+    try {
+      await common.utils.createPromisifiedHyperDB('db1')
+      expect(await common.utils.dbExists('db1')).toBe(true)
+    } catch (error) {
+      console.log(error)
+    }
+    common.utils.resetDbList()
+    expect(await common.utils.dbExists('db1')).toBe(false)
+    await common.utils.createPromisifiedHyperDB('db1')
+    expect(await common.utils.dbExists('db1')).toBe(true)
   })
 })
 
@@ -487,15 +491,8 @@ describe('Test login procedure', () => {
       const { link } = await masq.logIntoMasq()
       const url = new URL(link)
       const hashParams = getHashParams(url)
-      const wrongCryptoKey = await window.crypto.subtle.generateKey(
-        {
-          name: 'AES-GCM',
-          length: 128
-        },
-        true,
-        ['encrypt', 'decrypt']
-      )
-      const extractedWrongKey = await window.crypto.subtle.exportKey('raw', wrongCryptoKey)
+      // Extracted raw key is only a BUffer of bytes.
+      let extractedWrongKey = Buffer.from(common.crypto.genRandomBuffer(16))
       await Promise.all([
         mockMasqApp.handleConnectionAuthorized(hashParams.channel, extractedWrongKey),
         masq.logIntoMasqDone()
