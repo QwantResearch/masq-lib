@@ -2,8 +2,7 @@ const swarm = require('webrtc-swarm')
 const signalhub = require('signalhubws')
 const uuidv4 = require('uuid/v4')
 const pump = require('pump')
-
-const utils = require('./utils')
+const common = require('masq-common')
 const config = require('../config/config')
 
 const debug = (function () {
@@ -58,9 +57,9 @@ class Masq {
       throw Error('Not logged into Masq')
     }
 
-    const db = utils.createPromisifiedHyperDB(this.userId)
+    const db = common.utils.createPromisifiedHyperDB(this.userId)
     this.userAppDb = db
-    await utils.dbReady(db)
+    await common.utils.dbReady(db)
     this._startReplication()
   }
 
@@ -141,15 +140,8 @@ class Masq {
 
   async _genConnectionMaterial () {
     const channel = uuidv4()
-    const key = await window.crypto.subtle.generateKey(
-      {
-        name: 'AES-GCM',
-        length: 128
-      },
-      true, // whether the key is extractable (i.e. can be used in exportKey)
-      ['encrypt', 'decrypt'] // can 'encrypt', 'decrypt', 'wrapKey', or 'unwrapKey'
-    )
-    const extractedKey = await window.crypto.subtle.exportKey('raw', key)
+    const key = await common.crypto.genAESKey(true, 'AES-GCM', 128)
+    const extractedKey = await common.crypto.exportKey(key)
     const keyBase64 = Buffer.from(extractedKey).toString('base64')
     const myUrl = new URL(config.MASQ_APP_BASE_URL)
     const requestType = 'login'
@@ -181,29 +173,36 @@ class Masq {
 
   async _isRegistered (userId) {
     // is registered if there is a db for this userId
-    return utils.dbExists(userId)
+    return common.utils.dbExists(userId)
   }
 
   async _requestUserAppRegister (key, peer) {
-    peer.send(await utils.encryptMessage(key, {
+    const msg = {
       msg: 'registerUserApp',
       name: this.appName,
       description: this.appDescription,
       imageURL: this.appImageURL
-    }))
+    }
+    let encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
+    peer.send(JSON.stringify(encryptedMsg))
   }
 
   async _requestWriteAccess (encryptionKey, peer, localDbKey) {
-    peer.send(await utils.encryptMessage(encryptionKey, {
+    const msg = {
       msg: 'requestWriteAccess',
       key: localDbKey.toString('hex')
-    }))
+    }
+    const encryptedMsg = await common.crypto.encrypt(encryptionKey, msg, 'base64')
+    peer.send(JSON.stringify(encryptedMsg))
   }
 
   async _sendConnectionEstablished (key, peer) {
-    peer.send(await utils.encryptMessage(key, {
+    const msg = {
       msg: 'connectionEstablished'
-    }))
+    }
+    const encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
+
+    peer.send(JSON.stringify(encryptedMsg))
   }
 
   // All error handling for received messages
@@ -283,7 +282,7 @@ class Masq {
       // decrypt the received message and check if the right key has been used
       let json
       try {
-        json = await utils.decryptMessage(key, data)
+        json = await common.crypto.decrypt(key, JSON.parse(data), 'base64')
       } catch (err) {
         if (err.message === 'Unsupported state or unable to authenticate data') {
           handleError('Unable to read the message with the key sent to Masq-app')
@@ -327,8 +326,8 @@ class Masq {
           registering = false
 
           const buffKey = Buffer.from(json.key, 'hex')
-          db = utils.createPromisifiedHyperDB(userId, buffKey)
-          await utils.dbReady(db)
+          db = common.utils.createPromisifiedHyperDB(userId, buffKey)
+          await common.utils.dbReady(db)
 
           waitingForWriteAccess = true
           this._requestWriteAccess(key, peer, db.local.key)
