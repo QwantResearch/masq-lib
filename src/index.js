@@ -63,8 +63,8 @@ class Masq {
     this._startReplication()
   }
 
-  disconnect () {
-    return new Promise((resolve) => {
+  async disconnect () {
+    await new Promise((resolve) => {
       this.userAppDb = null
       if (!this.userAppRepSW) {
         this._reset()
@@ -76,6 +76,8 @@ class Masq {
         resolve()
       })
     })
+
+    await this._deleteSessionInfo(false)
   }
 
   async signout () {
@@ -83,11 +85,13 @@ class Masq {
     this.userAppDb = null
 
     await this.disconnect()
-    this._deleteSessionInfo()
+    this._deleteSessionInfo(true)
   }
 
-  _deleteSessionInfo () {
-    window.localStorage.removeItem('userId')
+  _deleteSessionInfo (deleteLocal) {
+    if (deleteLocal) {
+      window.localStorage.removeItem('userId')
+    }
     window.sessionStorage.removeItem('userId')
   }
 
