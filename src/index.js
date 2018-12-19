@@ -53,7 +53,7 @@ class Masq {
 
   async connectToMasq () {
     if (!this.isLoggedIn()) {
-      await this.disconnect()
+      await this._disconnect()
       throw Error('Not logged into Masq')
     }
 
@@ -63,7 +63,8 @@ class Masq {
     this._startReplication()
   }
 
-  async disconnect () {
+  // function useful to simulate the shutdown of a User-app
+  async _disconnect () {
     await new Promise((resolve) => {
       this.userAppDb = null
       if (!this.userAppRepSW) {
@@ -84,7 +85,7 @@ class Masq {
     this.userId = null
     this.userAppDb = null
 
-    await this.disconnect()
+    await this._disconnect()
     this._deleteSessionInfo(true)
   }
 
