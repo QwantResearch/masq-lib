@@ -82,11 +82,11 @@ describe('Test mock functions', () => {
   })
 })
 
-async function logInWithMasqAppMock () {
+async function logInWithMasqAppMock (stayConnected) {
   // stop replication if logInWithMasqAppMock has already been called
   mockMasqApp.destroy()
 
-  const { link } = await masq.logIntoMasq(true)
+  const { link } = await masq.logIntoMasq(stayConnected)
   const hashParams = common.utils.getHashParams(link)
 
   await Promise.all([
@@ -133,7 +133,7 @@ describe('Test login procedure', () => {
   test('should connect to Masq with key passed through url param', async () => {
     expect(masq.isLoggedIn()).toBe(false)
 
-    await logInWithMasqAppMock()
+    await logInWithMasqAppMock(false)
 
     expect(masq.isLoggedIn()).toBe(true)
   })
@@ -141,7 +141,7 @@ describe('Test login procedure', () => {
   test('should be able to connect with new Masq instance after logging in with stayConnected and disconnecting', async () => {
     expect(masq.isLoggedIn()).toBe(false)
 
-    await logInWithMasqAppMock()
+    await logInWithMasqAppMock(true)
 
     const key = '/hello'
     const value = { data: 'world' }
@@ -179,30 +179,49 @@ describe('Test login procedure', () => {
   test('should not be able to connect with new Masq instance after logging in without stayConnected and disconnecting', async () => {
     expect(masq.isLoggedIn()).toBe(false)
 
-    await logInWithMasqAppMock()
+    await logInWithMasqAppMock(false)
 
     expect(masq.isLoggedIn()).toBe(true)
     await masq.disconnect()
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(false)
 
-    // reconnect with new Masq instance
+    // reconnect with new Masq instance (masq2)
     const masq2 = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL)
-    expect(masq2.isLoggedIn()).toBe(true)
+    expect(masq2.isLoggedIn()).toBe(false)
     expect(masq2.isConnected()).toBe(false)
-    await masq2.connectToMasq()
+    await new Promise(async (resolve) => {
+      masq2.connectToMasq()
+        .catch((err) => {
+          expect(err.message).toBe('Not logged into Masq')
+          resolve()
+        })
+    })
+    expect(masq2.isLoggedIn()).toBe(false)
+    expect(masq2.isConnected()).toBe(false)
+
+    // connect with masq2
+    mockMasqApp.destroy()
+    const { link } = await masq2.logIntoMasq(false)
+    const hashParams = common.utils.getHashParams(link)
+    await Promise.all([
+      mockMasqApp.handleConnectionAuthorized(hashParams.channel, hashParams.key),
+      masq2.logIntoMasqDone()
+    ])
+
     expect(masq2.isLoggedIn()).toBe(true)
     expect(masq2.isConnected()).toBe(true)
+
+    // put with masq2
     const key = '/hello'
     const value = { data: 'world' }
     await masq2.put(key, value)
     const res = await masq2.get('/hello')
     expect(res).toEqual(value)
 
-    // signout
+    // signout with masq2
     await masq2.signout()
 
-    // fail to reconnect without logging in
     const masq3 = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL)
     expect(masq3.isLoggedIn()).toBe(false)
     expect(masq3.isConnected()).toBe(false)
@@ -212,7 +231,7 @@ describe('Test login procedure', () => {
   test('should be able to put and get values after connect', async () => {
     expect(masq.isLoggedIn()).toBe(false)
 
-    await logInWithMasqAppMock()
+    await logInWithMasqAppMock(false)
 
     const key = '/hello'
     const value = { data: 'world' }
@@ -227,7 +246,7 @@ describe('Test login procedure', () => {
     expect(masq.isLoggedIn()).toBe(false)
 
     for (let i = 0; i < 5; i++) {
-      await logInWithMasqAppMock()
+      await logInWithMasqAppMock(false)
       expect(masq.isLoggedIn()).toBe(true)
       expect(masq.isConnected()).toBe(true)
 
@@ -269,7 +288,7 @@ describe('Test login procedure', () => {
       expect(masq.isConnected()).toBe(false)
     }
 
-    await logInWithMasqAppMock()
+    await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(true)
 
@@ -290,7 +309,7 @@ describe('Test login procedure', () => {
     expect.assertions(12)
     expect(masq.isLoggedIn()).toBe(false)
 
-    await logInWithMasqAppMock()
+    await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(true)
 
@@ -322,7 +341,7 @@ describe('Test login procedure', () => {
     expect(masq.isLoggedIn()).toBe(false)
     expect(masq.isConnected()).toBe(false)
 
-    await logInWithMasqAppMock()
+    await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(true)
 
@@ -350,7 +369,7 @@ describe('Test login procedure', () => {
       expect(masq.isConnected()).toBe(false)
     }
 
-    await logInWithMasqAppMock()
+    await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(true)
 
@@ -374,7 +393,7 @@ describe('Test login procedure', () => {
   test('should be able to connect more than once without error', async () => {
     expect(masq.isLoggedIn()).toBe(false)
 
-    await logInWithMasqAppMock()
+    await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(true)
 
@@ -398,7 +417,7 @@ describe('Test login procedure', () => {
   test('should be able to sign out more than once without error', async () => {
     expect(masq.isLoggedIn()).toBe(false)
 
-    await logInWithMasqAppMock()
+    await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(true)
 
@@ -418,7 +437,7 @@ describe('Test login procedure', () => {
     expect(masq.isLoggedIn()).toBe(false)
     expect(masq.isConnected()).toBe(false)
 
-    await logInWithMasqAppMock()
+    await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(true)
   })
@@ -426,15 +445,15 @@ describe('Test login procedure', () => {
   test('should be able to login more than once without error', async () => {
     expect(masq.isLoggedIn()).toBe(false)
 
-    await logInWithMasqAppMock()
+    await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(true)
 
-    await logInWithMasqAppMock()
+    await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(true)
 
-    await logInWithMasqAppMock()
+    await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(true)
 
@@ -505,7 +524,7 @@ describe('Test login procedure', () => {
 describe('Test data access and input', () => {
   test('put/get should put and get an item', async () => {
     expect.assertions(1)
-    await logInWithMasqAppMock()
+    await logInWithMasqAppMock(false)
     const key = '/hello'
     const value = { data: 'world' }
     await masq.put(key, value)
@@ -515,7 +534,7 @@ describe('Test data access and input', () => {
 
   test('list should get every put items', async () => {
     expect.assertions(1)
-    await logInWithMasqAppMock()
+    await logInWithMasqAppMock(false)
     const keyValues = {
       'hello': { data: 'world' },
       'hello1': { data: 'world1' },
@@ -537,7 +556,7 @@ describe('Test data access and input', () => {
 
   test('del should del an item', async () => {
     expect.assertions(1)
-    await logInWithMasqAppMock()
+    await logInWithMasqAppMock(false)
     const key = '/hello'
     const value = { data: 'world' }
     await masq.put(key, value)
@@ -552,7 +571,7 @@ describe('Test data access and input', () => {
       expect(true).toBe(true)
       done()
     }
-    await logInWithMasqAppMock()
+    await logInWithMasqAppMock(false)
     const key = '/hello'
     const value = { data: 'world' }
     masq.watch('/hello', onChange)
@@ -563,7 +582,7 @@ describe('Test data access and input', () => {
     let resolvePrOnChangeMasqLib
     const prOnChangeMasqLib = new Promise((resolve) => { resolvePrOnChangeMasqLib = resolve })
 
-    await logInWithMasqAppMock()
+    await logInWithMasqAppMock(false)
     const key = '/hello'
     const value = { data: 'world' }
     masq.watch('/hello', resolvePrOnChangeMasqLib)
@@ -576,7 +595,7 @@ describe('Test data access and input', () => {
 describe('Test replication', () => {
   test('put/get should put an item and get in Mock Masq App', async () => {
     expect.assertions(1)
-    await logInWithMasqAppMock()
+    await logInWithMasqAppMock(false)
 
     let resolvePrOnChangeMockMasqApp
     const prOnChangeMockMasqApp = new Promise((resolve) => { resolvePrOnChangeMockMasqApp = resolve })
