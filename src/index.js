@@ -274,6 +274,9 @@ class Masq {
       this.signout()
     }
 
+    // make stayConnected a boolean
+    stayConnected = !!stayConnected
+
     // generation of link with new channel and key for the sync of new peer
     const { link, channel, key } = await this._genConnectionMaterial()
     let registering = false
