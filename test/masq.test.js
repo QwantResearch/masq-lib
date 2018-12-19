@@ -102,7 +102,7 @@ describe('Test login procedure', () => {
     const url = new URL(link)
     const base = config.MASQ_APP_BASE_URL
     expect(url.origin + url.pathname).toBe(base)
-    const hashParams = common.utils.getHashParams(url)
+    const hashParams = common.utils.getHashParams(link)
     expect(hashParams.channel).toHaveLength(uuidSize)
   })
 
@@ -111,8 +111,7 @@ describe('Test login procedure', () => {
 
     const pr = new Promise(async (resolve, reject) => {
       const { link } = await masq.logIntoMasq()
-      const url = new URL(link)
-      const hashParams = common.utils.getHashParams(url)
+      const hashParams = common.utils.getHashParams(link)
 
       // simulating masq app
       const hub = signalhub(hashParams.channel, config.HUB_URLS)
@@ -456,8 +455,7 @@ describe('Test login procedure', () => {
     expect.assertions(2)
 
     const { link } = await masq.logIntoMasq()
-    const url = new URL(link)
-    const hashParams = common.utils.getHashParams(url)
+    const hashParams = common.utils.getHashParams(link)
     const invalidKey = 'wrongChallenge'
     try {
       await Promise.all([
@@ -475,8 +473,7 @@ describe('Test login procedure', () => {
 
     try {
       const { link } = await masq.logIntoMasq()
-      const url = new URL(link)
-      const hashParams = common.utils.getHashParams(url)
+      const hashParams = common.utils.getHashParams(link)
       // Extracted raw key is only a BUffer of bytes.
       let extractedWrongKey = Buffer.from(common.crypto.genRandomBuffer(16))
       await Promise.all([
@@ -491,8 +488,7 @@ describe('Test login procedure', () => {
 
   test('should fail when register is refused', async () => {
     const { link } = await masq.logIntoMasq()
-    const url = new URL(link)
-    const hashParams = common.utils.getHashParams(url)
+    const hashParams = common.utils.getHashParams(link)
     await mockMasqApp.handleConnectionRegisterRefused(hashParams.channel, hashParams.key)
     expect.assertions(1)
     try {
