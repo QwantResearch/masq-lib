@@ -38,7 +38,7 @@ class MockMasqApp {
 
   async get (userAppId, key) {
     const node = await this.dbs[userAppId].getAsync(key)
-    if (!node) return undefined
+    if (!node) return null
     return node.value
   }
 

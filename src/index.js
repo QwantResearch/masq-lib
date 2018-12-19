@@ -418,7 +418,7 @@ class Masq {
   async get (key) {
     const db = this._getDB()
     const node = await db.getAsync(key)
-    if (!node) return undefined
+    if (!node) return null
     return node.value
   }
 
