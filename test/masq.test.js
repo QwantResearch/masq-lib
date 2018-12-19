@@ -543,7 +543,7 @@ describe('Test data access and input', () => {
     await masq.put(key, value)
     await masq.del(key)
     const res = await masq.get('/hello')
-    expect(res).toBeUndefined()
+    expect(res).toBeNull()
   })
 
   test('should set a watcher', async (done) => {
