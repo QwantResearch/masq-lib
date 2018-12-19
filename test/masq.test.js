@@ -66,6 +66,18 @@ afterEach(async () => {
   common.utils.resetDbList()
 })
 
+describe('localStorage and sessionStorage', () => {
+  test('check that localStorage exists', () => {
+    window.localStorage.setItem('testKey', 'testValue')
+    expect(window.localStorage.getItem('testKey')).toBe('testValue')
+  })
+
+  test('check that sessionStorage exists', () => {
+    window.sessionStorage.setItem('testKey', 'testValue')
+    expect(window.sessionStorage.getItem('testKey')).toBe('testValue')
+  })
+})
+
 describe('Test mock functions', () => {
   test('dbExists should work as expected', async () => {
     expect(await common.utils.dbExists('db1')).toBe(false)
