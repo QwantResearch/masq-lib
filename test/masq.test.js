@@ -162,7 +162,7 @@ describe('Test login procedure', () => {
     expect(res).toEqual(value)
 
     expect(masq.isLoggedIn()).toBe(true)
-    await masq.disconnect()
+    await masq._disconnect()
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(false)
 
@@ -194,7 +194,7 @@ describe('Test login procedure', () => {
     await logInWithMasqAppMock(false)
 
     expect(masq.isLoggedIn()).toBe(true)
-    await masq.disconnect()
+    await masq._disconnect()
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(false)
 
@@ -268,7 +268,7 @@ describe('Test login procedure', () => {
       const res = await masq.get('/hello')
       expect(res).toEqual(value)
 
-      await masq.disconnect()
+      await masq._disconnect()
       expect(masq.isLoggedIn()).toBe(true)
       expect(masq.isConnected()).toBe(false)
 
@@ -304,7 +304,7 @@ describe('Test login procedure', () => {
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(true)
 
-    await masq.disconnect()
+    await masq._disconnect()
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(false)
 
@@ -325,7 +325,7 @@ describe('Test login procedure', () => {
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(true)
 
-    await masq.disconnect()
+    await masq._disconnect()
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(false)
 
@@ -349,7 +349,7 @@ describe('Test login procedure', () => {
   test('should be able to disconnect even if not logged in or connected', async () => {
     expect(masq.isLoggedIn()).toBe(false)
 
-    await masq.disconnect()
+    await masq._disconnect()
     expect(masq.isLoggedIn()).toBe(false)
     expect(masq.isConnected()).toBe(false)
 
@@ -357,7 +357,7 @@ describe('Test login procedure', () => {
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(true)
 
-    await masq.disconnect()
+    await masq._disconnect()
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(false)
 
@@ -385,11 +385,11 @@ describe('Test login procedure', () => {
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(true)
 
-    await masq.disconnect()
+    await masq._disconnect()
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(false)
 
-    await masq.disconnect()
+    await masq._disconnect()
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(false)
 
@@ -409,7 +409,7 @@ describe('Test login procedure', () => {
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(true)
 
-    await masq.disconnect()
+    await masq._disconnect()
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(false)
 
@@ -433,7 +433,7 @@ describe('Test login procedure', () => {
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(true)
 
-    await masq.disconnect()
+    await masq._disconnect()
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(false)
 
@@ -469,7 +469,7 @@ describe('Test login procedure', () => {
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(true)
 
-    await masq.disconnect()
+    await masq._disconnect()
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(false)
 
