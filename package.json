@@ -25,7 +25,7 @@
     "random-access-idb": "^1.0.4",
     "signalhubws": "^1.0.6",
     "uuid": "^3.3.2",
-    "webrtc-swarm": "^2.9.0",
+    "webrtc-swarm": "git+https://github.com/G-Ray/webrtc-swarm#masq",
     "wrtc": "^0.2.1",
     "masq-common": "git+https://github.com/QwantResearch/masq-common"
   },
