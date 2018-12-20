@@ -21,17 +21,15 @@ npm run analyze
 ## Usage
 
 ``` js
-const Masq = require('masq-lib')
+const createMasq = require('masq-lib')
 
-const masq = new Masq(
+const masq = createMasq(
     'TestApp',
     'Some User-app',
     'http://www.some-user-app.com/logo.png'
 )
 
-if (masq.isLoggedIn()) {
-    await masq.connectToMasq()
-} else {
+if (!masq.isLoggedIn()) {
     const link = await masq.getLoginLink()
     // Display link to the user
     // and ask if he wants to stay connected on restart until he signs out
@@ -63,21 +61,6 @@ Returns a boolean, true if a User is already logged into Masq, false if not.
 The User can read and write data stored in his Masq only if he is logged in.
 This does not necessarily mean the data is synced, masq.isConnected() needs to be true for data to be synced between the different connected devices.
 
-#### `masq.isConnected() -> connected: boolean`
-
-Returns a boolean, true if a User is already logged into Masq and if the User-app is already connected to Masq.
-The User data is synced between the different connected devices only when the User is connected.
-
-#### `masq.connectToMasq() -> Promise<void>`
-
-Connects to Masq if a User is already logged into Masq.
-The data will then be synced between the different connected devices of the User.
-
-#### `masq.signout() -> Promise<void>`
-
-Signs out of Masq from Masq.
-This also means the User-app data on the device will stop being synced.
-
 ### `masq.getLoginLink() -> Promise<link: string>`
 
 The function returns a Promise resolving to an Url which must be opened by the user in order to connect to Masq.
@@ -88,6 +71,11 @@ The function returns a Promise resolving to an Url which must be opened by the u
 
 This function starts the login procedure with an instance of Masq-app
 Once the user accesses the link and connects to his profile, the login will end and the returned promise will resolve.
+
+#### `masq.signout() -> Promise<void>`
+
+Signs out of Masq from Masq.
+This also means the User-app data on the device will stop being synced.
 
 #### `masq.get(key) -> Promise<string>`
 

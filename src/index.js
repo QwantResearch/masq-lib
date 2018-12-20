@@ -51,12 +51,12 @@ class Masq {
     return !!this.userId
   }
 
-  isConnected () {
+  _isConnected () {
     // is connected if the userAppDb has been created and initialized
     return !!this.userAppDb
   }
 
-  async connectToMasq () {
+  async _connectToMasq () {
     if (!this.isLoggedIn()) {
       await this._disconnect()
       throw Error('Not logged into Masq')
@@ -320,7 +320,7 @@ class Masq {
             // Store the session info
             this._storeSessionInfo(stayConnected, userId)
 
-            await this.connectToMasq()
+            await this._connectToMasq()
             // logged into Masq
             await this._sendConnectionEstablished(key, peer)
             sw.close()
@@ -465,4 +465,13 @@ class Masq {
   }
 }
 
-module.exports = Masq
+const createMasq = async (...args) => {
+  const masq = new Masq(...args)
+  if (masq.isLoggedIn()) {
+    await masq._connectToMasq()
+  }
+
+  return masq
+}
+
+module.exports = createMasq
