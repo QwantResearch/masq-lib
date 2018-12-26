@@ -14,6 +14,13 @@ const debug = (function () {
   }
 })()
 
+const createSwarm = (hub) => {
+  return swarm(hub, {
+    wrtc: !swarm.WEBRTC_SUPPORT ? require('wrtc') : null,
+    config: config.SWARM_CONFIG
+  })
+}
+
 class Masq {
   /**
    * constructor
@@ -130,8 +137,7 @@ class Masq {
       // Subscribe to channel for a limited time to sync with masq
       debug(`Creation of a hub with ${channel} channel name`)
       const hub = signalhub(channel, config.HUB_URLS)
-      const swOpts = swarm.WEBRTC_SUPPORT ? undefined : { wrtc: require('wrtc') }
-      const sw = swarm(hub, swOpts)
+      const sw = createSwarm(hub)
 
       sw.on('peer', (peer, id) => {
         debug(`The peer ${id} join us...`)
@@ -151,12 +157,7 @@ class Masq {
   _startReplication () {
     const discoveryKey = this.userAppDb.discoveryKey.toString('hex')
     this.userAppRepHub = signalhub(discoveryKey, config.HUB_URLS)
-
-    if (swarm.WEBRTC_SUPPORT) {
-      this.userAppRepSW = swarm(this.userAppRepHub)
-    } else {
-      this.userAppRepSW = swarm(this.userAppRepHub, { wrtc: require('wrtc') })
-    }
+    this.userAppRepSW = createSwarm(this.userAppRepHub)
 
     this.userAppRepSW.on('peer', async (peer, id) => {
       const stream = this.userAppDb.replicate({ live: true })
