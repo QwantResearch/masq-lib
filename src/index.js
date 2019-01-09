@@ -38,6 +38,7 @@ class Masq {
     this.appImageURL = appImageURL
 
     this.userId = null
+    this.dataEncryptionKey = null
     this.userAppDb = null
 
     this._loadSessionInfo()
@@ -110,20 +111,26 @@ class Masq {
       window.localStorage.removeItem('userId')
     }
     window.sessionStorage.removeItem('userId')
+    window.localStorage.removeItem('dataEncryptionKey')
+    window.sessionStorage.removeItem('dataEncryptionKey')
   }
 
-  _storeSessionInfo (stayConnected, userId) {
+  _storeSessionInfo (stayConnected, userId, dataEncryptionKey) {
     if (stayConnected) {
       window.localStorage.setItem('userId', userId)
+      window.localStorage.setItem('dataEncryptionKey', dataEncryptionKey)
     }
     window.sessionStorage.setItem('userId', userId)
+    window.sessionStorage.setItem('dataEncryptionKey', dataEncryptionKey)
   }
 
   _loadSessionInfo () {
     // If userId is in sesssion storage, use it and do not touch localStorage
     const sessionUserId = window.sessionStorage.getItem('userId')
-    if (sessionUserId) {
+    const sessionDataEncryptionKey = window.sessionStorage.getItem('dataEncryptionKey')
+    if (sessionUserId && sessionDataEncryptionKey) {
       this.userId = sessionUserId
+      this.dataEncryptionKey = sessionDataEncryptionKey
       return
     }
 
@@ -133,6 +140,11 @@ class Masq {
     if (localStorageUserId) {
       this.userId = localStorageUserId
       window.sessionStorage.setItem('userId', this.userId)
+    }
+    const localStorageDataEncryptionKey = window.localStorage.getItem('dataEncryptionKey')
+    if (localStorageDataEncryptionKey) {
+      this.dataEncryptionKey = localStorageDataEncryptionKey
+      window.sessionStorage.setItem('dataEncryptionKey', this.dataEncryptionKey)
     }
   }
 
@@ -210,6 +222,9 @@ class Masq {
         if (!json.userAppDbId) {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'User Id not found in \'authorized\' message')
         }
+        if (!json.userAppDEK) {
+          handleError('User app dataEncryptionKey (userAppDEK) not found in \'authorized\' message')
+        }
         break
 
       case 'notAuthorized':
@@ -226,6 +241,9 @@ class Masq {
 
         if (!json.userAppDbId) {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'User Id not found in "masqAccessGranted" message')
+        }
+        if (!json.userAppDEK) {
+          handleError('User app dataEncryptionKey (userAppDEK) not found in "masqAccessGranted" message')
         }
         break
 
@@ -283,6 +301,7 @@ class Masq {
 
     let userId
     let db
+    let dataEncryptionKey
 
     const handleData = async (sw, peer, data) => {
       const handleError = (err) => {
@@ -303,12 +322,14 @@ class Masq {
       switch (json.msg) {
         case 'authorized':
           userId = json.userAppDbId
+          dataEncryptionKey = json.userAppDEK
 
           // Check if the User-app is already registered
           if (await this._isRegistered(userId)) {
             this.userId = userId
+            this.dataEncryptionKey = dataEncryptionKey
             // Store the session info
-            this._storeSessionInfo(stayConnected, userId)
+            this._storeSessionInfo(stayConnected, userId, dataEncryptionKey)
 
             await this.connectToMasq()
             // logged into Masq
@@ -316,7 +337,6 @@ class Masq {
             sw.close()
             return
           }
-
           // if this UserApp instance is not registered
           registering = true
           this._requestUserAppRegister(key, peer)
@@ -348,8 +368,9 @@ class Masq {
           waitingForWriteAccess = false
 
           // Store the session info
-          this._storeSessionInfo(stayConnected, userId)
+          this._storeSessionInfo(stayConnected, userId, dataEncryptionKey)
           this.userId = userId
+          this.dataEncryptionKey = dataEncryptionKey
           this.userAppDb = db
           this._startReplication()
 
@@ -395,6 +416,10 @@ class Masq {
     return this.userAppDb
   }
 
+  _checkDEK () {
+    if (!this.dataEncryptionKey) throw Error('Data encryption key is not set')
+  }
+
   /**
    * Set a watcher
    * @param {string} key - Key
@@ -425,6 +450,7 @@ class Masq {
    */
   async put (key, value) {
     const db = this._getDB()
+    this._checkDEK()
     return db.putAsync(key, value)
   }
 
@@ -435,6 +461,7 @@ class Masq {
    */
   async del (key) {
     const db = this._getDB()
+    this._checkDEK()
     return db.delAsync(key)
   }
 
@@ -445,6 +472,7 @@ class Masq {
    */
   async list (prefix) {
     const db = this._getDB()
+    this._checkDEK()
     const list = await db.listAsync(prefix)
     const reformattedDic = list.reduce((dic, e) => {
       const el = Array.isArray(e) ? e[0] : e

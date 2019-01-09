@@ -70,6 +70,7 @@ class MockMasqApp {
         const hub = signalhub(channel, config.HUB_URLS)
         const sw = swarm(hub, { wrtc })
         const userAppId = 'userAppId-' + uuidv4()
+        const userAppDEK = '0x00112233445566778899AABBCCDDEEFF'
 
         let key
         try {
@@ -86,7 +87,8 @@ class MockMasqApp {
           if (authorized) {
             const msg = {
               msg: 'authorized',
-              userAppDbId: userAppId
+              userAppDbId: userAppId,
+              userAppDEK
             }
             const encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
             peer.send(JSON.stringify(encryptedMsg))
@@ -115,6 +117,7 @@ class MockMasqApp {
                   const msg = {
                     msg: 'masqAccessGranted',
                     userAppDbId: userAppId,
+                    userAppDEK,
                     key: this.dbs[userAppId].key.toString('hex')
                   }
                   const encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
