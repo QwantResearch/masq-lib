@@ -70,7 +70,7 @@ class MockMasqApp {
         const hub = signalhub(channel, config.HUB_URLS)
         const sw = swarm(hub, { wrtc })
         const userAppId = 'userAppId-' + uuidv4()
-        const userAppDEK = '0x00112233445566778899AABBCCDDEEFF'
+        const userAppDEK = '00112233445566778899AABBCCDDEEFF'
 
         let key
         try {

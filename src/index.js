@@ -124,13 +124,13 @@ class Masq {
     window.sessionStorage.setItem('dataEncryptionKey', dataEncryptionKey)
   }
 
-  _loadSessionInfo () {
+  async _loadSessionInfo () {
     // If userId is in sesssion storage, use it and do not touch localStorage
     const sessionUserId = window.sessionStorage.getItem('userId')
     const sessionDataEncryptionKey = window.sessionStorage.getItem('dataEncryptionKey')
     if (sessionUserId && sessionDataEncryptionKey) {
       this.userId = sessionUserId
-      this.dataEncryptionKey = sessionDataEncryptionKey
+      this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(sessionDataEncryptionKey, 'hex'))
       return
     }
 
@@ -143,8 +143,8 @@ class Masq {
     }
     const localStorageDataEncryptionKey = window.localStorage.getItem('dataEncryptionKey')
     if (localStorageDataEncryptionKey) {
-      this.dataEncryptionKey = localStorageDataEncryptionKey
-      window.sessionStorage.setItem('dataEncryptionKey', this.dataEncryptionKey)
+      this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(localStorageDataEncryptionKey, 'hex'))
+      window.sessionStorage.setItem('dataEncryptionKey', localStorageDataEncryptionKey)
     }
   }
 
@@ -371,7 +371,7 @@ class Masq {
           // Store the session info
           this._storeSessionInfo(stayConnected, userId, dataEncryptionKey)
           this.userId = userId
-          this.dataEncryptionKey = dataEncryptionKey
+          this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
           this.userAppDb = db
           this._startReplication()
 
