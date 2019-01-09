@@ -327,7 +327,8 @@ class Masq {
           // Check if the User-app is already registered
           if (await this._isRegistered(userId)) {
             this.userId = userId
-            this.dataEncryptionKey = dataEncryptionKey
+            // store the dataEncryptionKey as a CryptoKey
+            this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
             // Store the session info
             this._storeSessionInfo(stayConnected, userId, dataEncryptionKey)
 
