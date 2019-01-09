@@ -421,6 +421,16 @@ class Masq {
     if (!this.dataEncryptionKey) throw Error('Data encryption key is not set')
   }
 
+  async _decryptValue (ciphertext) {
+    let decryptedMsg = await common.crypto.decrypt(this.dataEncryptionKey, ciphertext)
+    return decryptedMsg
+  }
+
+  async _encryptValue (plaintext) {
+    let encryptedMsg = await common.crypto.encrypt(this.dataEncryptionKey, plaintext)
+    return encryptedMsg
+  }
+
   /**
    * Set a watcher
    * @param {string} key - Key
@@ -440,7 +450,10 @@ class Masq {
     const db = this._getDB()
     const node = await db.getAsync(key)
     if (!node) return null
-    return node.value
+    const dec = await this._decryptValue(node.value)
+    console.log(dec)
+    return dec
+    // return node.value
   }
 
   /**
@@ -452,7 +465,10 @@ class Masq {
   async put (key, value) {
     const db = this._getDB()
     this._checkDEK()
-    return db.putAsync(key, value)
+    const enc = await this._encryptValue(value)
+    console.log(enc, value)
+    return db.putAsync(key, enc)
+    // return db.putAsync(key, value)
   }
 
   /**
@@ -475,12 +491,21 @@ class Masq {
     const db = this._getDB()
     this._checkDEK()
     const list = await db.listAsync(prefix)
-    const reformattedDic = list.reduce((dic, e) => {
-      const el = Array.isArray(e) ? e[0] : e
-      dic[el.key] = el.value
-      return dic
-    }, {})
-    return reformattedDic
+    // console.log(list)
+
+    const dic = {}
+    for (let elt of list) {
+      dic[elt.key] = await this._decryptValue(elt.value)
+    }
+    console.log(dic)
+
+    // const reformattedDic = list.reduce((dic, e) => {
+    //   const el = Array.isArray(e) ? e[0] : e
+    //   dic[el.key] = el.value
+    //   return dic
+    // }, {})
+    // return reformattedDic
+    return dic
   }
 }
 

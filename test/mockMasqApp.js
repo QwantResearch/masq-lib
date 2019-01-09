@@ -14,6 +14,12 @@ class MockMasqApp {
     this.dbs = {}
     this.dbsRepHub = {}
     this.dbsRepSW = {}
+    this.userAppDEK = '00112233445566778899AABBCCDDEEFF'
+    this.dataEncryptionKey = null
+  }
+
+  async init () {
+    this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(this.userAppDEK, 'hex'))
   }
 
   destroy () {
@@ -38,14 +44,27 @@ class MockMasqApp {
     })
   }
 
+  async _decryptValue (ciphertext) {
+    let decryptedMsg = await common.crypto.decrypt(this.dataEncryptionKey, ciphertext)
+    return decryptedMsg
+  }
+
+  async _encryptValue (plaintext) {
+    let encryptedMsg = await common.crypto.encrypt(this.dataEncryptionKey, plaintext)
+    return encryptedMsg
+  }
+
   async get (userAppId, key) {
     const node = await this.dbs[userAppId].getAsync(key)
     if (!node) return null
-    return node.value
+    const dec = await this._decryptValue(node.value)
+    return dec
+    // return node.value
   }
 
   async put (userAppId, key, value) {
-    return this.dbs[userAppId].putAsync(key, value)
+    const enc = await this._encryptValue(value)
+    return this.dbs[userAppId].putAsync(key, enc)
   }
 
   watch (userAppId, key, cb) {
@@ -70,7 +89,6 @@ class MockMasqApp {
         const hub = signalhub(channel, config.HUB_URLS)
         const sw = swarm(hub, { wrtc })
         const userAppId = 'userAppId-' + uuidv4()
-        const userAppDEK = '00112233445566778899AABBCCDDEEFF'
 
         let key
         try {
@@ -88,7 +106,7 @@ class MockMasqApp {
             const msg = {
               msg: 'authorized',
               userAppDbId: userAppId,
-              userAppDEK
+              userAppDEK: this.userAppDEK
             }
             const encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
             peer.send(JSON.stringify(encryptedMsg))
@@ -117,7 +135,7 @@ class MockMasqApp {
                   const msg = {
                     msg: 'masqAccessGranted',
                     userAppDbId: userAppId,
-                    userAppDEK,
+                    userAppDEK: this.userAppDEK,
                     key: this.dbs[userAppId].key.toString('hex')
                   }
                   const encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')

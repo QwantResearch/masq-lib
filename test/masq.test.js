@@ -56,9 +56,10 @@ afterAll((done) => {
   server.close(done)
 })
 
-beforeEach(() => {
+beforeEach(async () => {
   masq = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL)
   mockMasqApp = new MasqAppMock()
+  await mockMasqApp.init()
 })
 
 afterEach(async () => {
