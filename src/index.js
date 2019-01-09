@@ -451,7 +451,7 @@ class Masq {
     const node = await db.getAsync(key)
     if (!node) return null
     const dec = await this._decryptValue(node.value)
-    console.log(dec)
+    // console.log(dec)
     return dec
     // return node.value
   }
@@ -466,9 +466,8 @@ class Masq {
     const db = this._getDB()
     this._checkDEK()
     const enc = await this._encryptValue(value)
-    console.log(enc, value)
+    // console.log(enc, value)
     return db.putAsync(key, enc)
-    // return db.putAsync(key, value)
   }
 
   /**
