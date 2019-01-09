@@ -491,26 +491,19 @@ class Masq {
     const db = this._getDB()
     this._checkDEK()
     const list = await db.listAsync(prefix)
-    // console.log(list)
 
-    const dic = {}
-    for (let elt of list) {
-      dic[elt.key] = await this._decryptValue(elt.value)
-    }
-    console.log(dic)
-    const dic2 = {}
-    await Promise.all(list.map(async (elt) => {
-      dic[elt.key] = await this._decryptValue(elt.value)
-    }))
-    console.log(dic2)
+    const decList = await Promise.all(list.map(async (elt) => ({
+      key: elt.key,
+      value: await this._decryptValue(elt.value)
+    })
+    ))
 
-    // const reformattedDic = list.reduce((dic, e) => {
-    //   const el = Array.isArray(e) ? e[0] : e
-    //   dic[el.key] = el.value
-    //   return dic
-    // }, {})
-    // return reformattedDic
-    return dic
+    const reformattedDic = decList.reduce((dic, e) => {
+      const el = Array.isArray(e) ? e[0] : e
+      dic[el.key] = el.value
+      return dic
+    }, {})
+    return reformattedDic
   }
 }
 
