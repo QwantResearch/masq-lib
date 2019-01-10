@@ -4,6 +4,7 @@ const swarm = require('webrtc-swarm')
 const wrtc = require('wrtc')
 window.crypto = require('@trust/webcrypto')
 const common = require('masq-common')
+const ERRORS = common.errors.ERRORS
 
 const Masq = require('../src')
 const MasqAppMock = require('./mockMasqApp')
@@ -204,7 +205,7 @@ describe('Test login procedure', () => {
     await new Promise(async (resolve) => {
       masq2.connectToMasq()
         .catch((err) => {
-          expect(err.message).toBe('Not logged into Masq')
+          expect(err.type).toBe(ERRORS.NOT_LOGGED_IN)
           resolve()
         })
     })
@@ -274,7 +275,7 @@ describe('Test login procedure', () => {
       try {
         await masq.put(key, value)
       } catch (err) {
-        expect(err.message).toEqual('Not connected to Masq')
+        expect(err.type).toEqual(ERRORS.NOT_CONNECTED)
       }
 
       await masq.connectToMasq()
@@ -294,7 +295,7 @@ describe('Test login procedure', () => {
     try {
       await masq.connectToMasq()
     } catch (err) {
-      expect(err.message).toBe('Not logged into Masq')
+      expect(err.type).toBe(ERRORS.NOT_LOGGED_IN)
       expect(masq.isLoggedIn()).toBe(false)
       expect(masq.isConnected()).toBe(false)
     }
@@ -339,7 +340,7 @@ describe('Test login procedure', () => {
     try {
       await masq.connectToMasq()
     } catch (err) {
-      expect(err.message).toBe('Not logged into Masq')
+      expect(err.type).toBe(ERRORS.NOT_LOGGED_IN)
       expect(masq.isLoggedIn()).toBe(false)
       expect(masq.isConnected()).toBe(false)
     }
@@ -375,7 +376,7 @@ describe('Test login procedure', () => {
     try {
       await masq.connectToMasq()
     } catch (err) {
-      expect(err.message).toBe('Not logged into Masq')
+      expect(err.type).toBe(ERRORS.NOT_LOGGED_IN)
       expect(masq.isLoggedIn()).toBe(false)
       expect(masq.isConnected()).toBe(false)
     }
@@ -494,7 +495,7 @@ describe('Test login procedure', () => {
       ])
     } catch (err) {
       expect(err).toBeDefined()
-      expect(err.message).toBe('Invalid Key')
+      expect(err.type).toBe(ERRORS.INVALID_KEY)
     }
   })
 
@@ -512,7 +513,7 @@ describe('Test login procedure', () => {
       ])
     } catch (err) {
       expect(err).toBeDefined()
-      expect(err.message).toBe('Unable to read the message with the key sent to Masq-app')
+      expect(err.type).toBe(ERRORS.UNABLE_TO_DECRYPT)
     }
   })
 
@@ -526,7 +527,7 @@ describe('Test login procedure', () => {
         masq.logIntoMasq(false)
       ])
     } catch (e) {
-      expect(e.message).toBe('Masq access refused by the user')
+      expect(e.type).toBe(ERRORS.MASQ_ACCESS_REFUSED_BY_USER)
     }
   })
 })

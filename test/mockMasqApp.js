@@ -4,6 +4,8 @@ const wrtc = require('wrtc')
 const uuidv4 = require('uuid/v4')
 const pump = require('pump')
 const common = require('masq-common')
+const ERRORS = common.errors.ERRORS
+const MasqError = common.errors.MasqError
 
 const config = require('../config/config')
 
@@ -74,7 +76,7 @@ class MockMasqApp {
           key = await common.crypto.importKey(rawKey)
         } catch (err) {
           sw.close()
-          return reject(Error('Invalid Key'))
+          return reject(new MasqError(ERRORS.INVALID_KEY))
         }
 
         let registered = false
@@ -104,7 +106,7 @@ class MockMasqApp {
                 break
               case 'registerUserApp':
                 if (registered) {
-                  reject(Error('Already registered but received message with type "registered"'))
+                  reject(new MasqError(ERRORS.WRONG_MESSAGE, 'Already registered but received message with type "registered"'))
                 }
                 if (registerAccepted) {
                   this.dbs[userAppId] = common.utils.createPromisifiedHyperDB(userAppId)
@@ -129,7 +131,7 @@ class MockMasqApp {
                 break
               case 'requestWriteAccess':
                 if (!registered) {
-                  reject(Error('Expected to receive message with type "register", but received "requestWriteAccess"'))
+                  reject(new MasqError(ERRORS.WRONG_MESSAGE, 'Expected to receive message with type "register", but received "requestWriteAccess"'))
                 }
 
                 this.dbs[userAppId].authorizeAsync(Buffer.from(json.key, 'hex')).then(async () => {
@@ -143,7 +145,7 @@ class MockMasqApp {
 
                 break
               default:
-                reject(Error(`Expected to receive message with type "register" or "requestWriteAccess", but received "${json.msg}"`))
+                reject(new MasqError(ERRORS.WRONG_MESSAGE, `Expected to receive message with type "register" or "requestWriteAccess", but received "${json.msg}"`))
                 sw.close()
                 break
             }
