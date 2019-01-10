@@ -2,7 +2,11 @@ const swarm = require('webrtc-swarm')
 const signalhub = require('signalhubws')
 const uuidv4 = require('uuid/v4')
 const pump = require('pump')
+
 const common = require('masq-common')
+const ERRORS = common.errors.ERRORS
+const MasqError = common.errors.MasqError
+
 const config = require('../config/config')
 
 const debug = (function () {
@@ -66,7 +70,7 @@ class Masq {
   async connectToMasq () {
     if (!this.isLoggedIn()) {
       await this._disconnect()
-      throw Error('Not logged into Masq')
+      throw new MasqError(ERRORS.NOT_LOGGED_IN)
     }
 
     const db = common.utils.createPromisifiedHyperDB(this.userId)
@@ -200,16 +204,11 @@ class Masq {
   }
 
   // All error handling for received messages
-  _checkMessage (json, registering, waitingForWriteAccess, errorHandler) {
-    let err = false
-    const handleError = () => {
-      errorHandler()
-      err = true
-    }
+  _checkMessage (json, registering, waitingForWriteAccess) {
     switch (json.msg) {
       case 'authorized':
         if (!json.userAppDbId) {
-          handleError('User Id not found in \'authorized\' message')
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'User Id not found in \'authorized\' message')
         }
         break
 
@@ -218,38 +217,33 @@ class Masq {
 
       case 'masqAccessGranted':
         if (!registering) {
-          handleError('Unexpectedly received "masqAccessGranted" message while not registering')
-          break
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'Unexpectedly received "masqAccessGranted" message while not registering')
         }
 
         if (!json.key) {
-          handleError('Database key not found in "masqAccessGranted" message')
-          break
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'Database key not found in "masqAccessGranted" message')
         }
 
         if (!json.userAppDbId) {
-          handleError('User Id not found in "masqAccessGranted" message')
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'User Id not found in "masqAccessGranted" message')
         }
         break
 
       case 'masqAccessRefused':
         if (!registering) {
-          handleError('Unexpectedly received "masqAccessRefused" while not registering')
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'Unexpectedly received "masqAccessRefused" while not registering')
         }
         break
 
       case 'writeAccessGranted':
         if (!waitingForWriteAccess) {
-          handleError('Unexpectedly received "writeAccessGranted" while not waiting for write access')
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'Unexpectedly received "writeAccessGranted" while not waiting for write access')
         }
         break
 
       default:
-        handleError(`Unexpectedly received message with type ${json.msg}`)
-        break
+        throw new MasqError(ERRORS.WRONG_MESSAGE, `Unexpectedly received message with type ${json.msg}`)
     }
-
-    return err
   }
 
   async getLoginLink () {
@@ -291,8 +285,8 @@ class Masq {
     let db
 
     const handleData = async (sw, peer, data) => {
-      const handleError = (msg) => {
-        this._logIntoMasqErr = Error(msg)
+      const handleError = (err) => {
+        this._logIntoMasqErr = err
         sw.close()
       }
 
@@ -300,16 +294,11 @@ class Masq {
       let json
       try {
         json = await common.crypto.decrypt(key, JSON.parse(data), 'base64')
+        this._checkMessage(json, registering, waitingForWriteAccess)
       } catch (err) {
-        if (err.message === 'Unsupported state or unable to authenticate data') {
-          handleError('Unable to read the message with the key sent to Masq-app')
-          return
-        }
-        handleError('Unknown error while decrypting: ' + err.message)
+        handleError(err)
         return
       }
-
-      this._checkMessage(json, registering, waitingForWriteAccess, handleError)
 
       switch (json.msg) {
         case 'authorized':
@@ -352,7 +341,7 @@ class Masq {
 
         case 'masqAccessRefused':
           registering = false
-          handleError('Masq access refused by the user')
+          handleError(new MasqError(ERRORS.MASQ_ACCESS_REFUSED_BY_USER))
           return
 
         case 'writeAccessGranted':
@@ -402,7 +391,7 @@ class Masq {
   //
 
   _getDB () {
-    if (!this.userAppDb) throw Error('Not connected to Masq')
+    if (!this.userAppDb) throw new MasqError(ERRORS.NOT_CONNECTED)
     return this.userAppDb
   }
 
