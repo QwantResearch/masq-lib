@@ -2,9 +2,9 @@ const signalserver = require('signalhubws/server')
 const signalhub = require('signalhubws')
 const swarm = require('webrtc-swarm')
 const wrtc = require('wrtc')
-window.crypto = require('@trust/webcrypto')
 const common = require('masq-common')
 const ERRORS = common.errors.ERRORS
+window.crypto = require('@trust/webcrypto')
 
 const Masq = require('../src')
 const MasqAppMock = require('./mockMasqApp')
@@ -13,6 +13,9 @@ const config = require('../config/config')
 const APP_NAME = 'app1'
 const APP_DESCRIPTION = 'A wonderful app'
 const APP_IMAGE_URL = ' a link to image'
+
+const { dbExists, createPromisifiedHyperDB, resetDbList, getHashParams } = common.utils
+const { genRandomBuffer } = common.crypto
 
 // user an in memory random-access-storage instead
 jest.mock('random-access-idb', () =>
@@ -63,7 +66,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await masq.signout()
   mockMasqApp.destroy()
-  common.utils.resetDbList()
+  resetDbList()
 })
 
 describe('localStorage and sessionStorage', () => {
@@ -82,17 +85,13 @@ describe('localStorage and sessionStorage', () => {
 
 describe('Test mock functions', () => {
   test('dbExists should work as expected', async () => {
-    expect(await common.utils.dbExists('db1')).toBe(false)
-    try {
-      await common.utils.createPromisifiedHyperDB('db1')
-      expect(await common.utils.dbExists('db1')).toBe(true)
-    } catch (error) {
-      console.log(error)
-    }
-    common.utils.resetDbList()
-    expect(await common.utils.dbExists('db1')).toBe(false)
-    await common.utils.createPromisifiedHyperDB('db1')
-    expect(await common.utils.dbExists('db1')).toBe(true)
+    expect(await dbExists('db1')).toBe(false)
+    await createPromisifiedHyperDB('db1')
+    expect(await dbExists('db1')).toBe(true)
+    resetDbList()
+    expect(await dbExists('db1')).toBe(false)
+    await createPromisifiedHyperDB('db1')
+    expect(await dbExists('db1')).toBe(true)
   })
 })
 
@@ -101,7 +100,7 @@ async function logInWithMasqAppMock (stayConnected) {
   mockMasqApp.destroy()
 
   const link = await masq.getLoginLink()
-  const hashParams = common.utils.getHashParams(link)
+  const hashParams = getHashParams(link)
 
   await Promise.all([
     mockMasqApp.handleConnectionAuthorized(hashParams.channel, hashParams.key),
@@ -116,7 +115,7 @@ describe('Test login procedure', () => {
     const url = new URL(link)
     const base = config.MASQ_APP_BASE_URL
     expect(url.origin + url.pathname).toBe(base)
-    const hashParams = common.utils.getHashParams(link)
+    const hashParams = getHashParams(link)
     expect(hashParams.channel).toHaveLength(uuidSize)
   })
 
@@ -125,7 +124,7 @@ describe('Test login procedure', () => {
 
     const pr = new Promise(async (resolve, reject) => {
       const link = await masq.getLoginLink()
-      const hashParams = common.utils.getHashParams(link)
+      const hashParams = getHashParams(link)
 
       // simulating masq app
       const hub = signalhub(hashParams.channel, config.HUB_URLS)
@@ -215,7 +214,7 @@ describe('Test login procedure', () => {
     // connect with masq2
     mockMasqApp.destroy()
     const link = await masq2.getLoginLink()
-    const hashParams = common.utils.getHashParams(link)
+    const hashParams = getHashParams(link)
     await Promise.all([
       mockMasqApp.handleConnectionAuthorized(hashParams.channel, hashParams.key),
       masq2.logIntoMasq(false)
@@ -486,7 +485,7 @@ describe('Test login procedure', () => {
     expect.assertions(2)
 
     const link = await masq.getLoginLink()
-    const hashParams = common.utils.getHashParams(link)
+    const hashParams = getHashParams(link)
     const invalidKey = 'wrongChallenge'
     try {
       await Promise.all([
@@ -504,9 +503,9 @@ describe('Test login procedure', () => {
 
     try {
       const link = await masq.getLoginLink()
-      const hashParams = common.utils.getHashParams(link)
+      const hashParams = getHashParams(link)
       // Extracted raw key is only a BUffer of bytes.
-      let extractedWrongKey = Buffer.from(common.crypto.genRandomBuffer(16))
+      let extractedWrongKey = Buffer.from(genRandomBuffer(16))
       await Promise.all([
         mockMasqApp.handleConnectionAuthorized(hashParams.channel, extractedWrongKey),
         masq.logIntoMasq(false)
@@ -519,7 +518,7 @@ describe('Test login procedure', () => {
 
   test('should fail when register is refused', async () => {
     const link = await masq.getLoginLink()
-    const hashParams = common.utils.getHashParams(link)
+    const hashParams = getHashParams(link)
     expect.assertions(1)
     try {
       await Promise.all([
