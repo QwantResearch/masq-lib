@@ -109,9 +109,9 @@ class Masq {
   _deleteSessionInfo (deleteLocal) {
     if (deleteLocal) {
       window.localStorage.removeItem('userId')
+      window.localStorage.removeItem('dataEncryptionKey')
     }
     window.sessionStorage.removeItem('userId')
-    window.localStorage.removeItem('dataEncryptionKey')
     window.sessionStorage.removeItem('dataEncryptionKey')
   }
 
@@ -128,6 +128,7 @@ class Masq {
     // If userId is in sesssion storage, use it and do not touch localStorage
     const sessionUserId = window.sessionStorage.getItem('userId')
     const sessionDataEncryptionKey = window.sessionStorage.getItem('dataEncryptionKey')
+
     if (sessionUserId) {
       this.userId = sessionUserId
       this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(sessionDataEncryptionKey, 'hex'))

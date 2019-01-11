@@ -153,7 +153,6 @@ describe('Test login procedure', () => {
 
   test('should be able to connect with new Masq instance after logging in with stayConnected and disconnecting', async () => {
     expect(masq.isLoggedIn()).toBe(false)
-
     await logInWithMasqAppMock(true)
 
     const key = '/hello'
