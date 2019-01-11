@@ -17,6 +17,12 @@ const APP_IMAGE_URL = ' a link to image'
 const { dbExists, createPromisifiedHyperDB, resetDbList, getHashParams } = common.utils
 const { genRandomBuffer } = common.crypto
 
+let server = null
+let masq = null
+let mockMasqApp = null
+
+jest.setTimeout(30000)
+
 // user an in memory random-access-storage instead
 jest.mock('random-access-idb', () =>
   () => require('random-access-memory'))
@@ -40,12 +46,6 @@ jest.mock('masq-common', () => {
     }
   }
 })
-
-jest.setTimeout(30000)
-
-let server = null
-let masq = null
-let mockMasqApp = null
 
 beforeAll((done) => {
   server = signalserver()
