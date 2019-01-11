@@ -47,6 +47,19 @@ jest.mock('masq-common', () => {
   }
 })
 
+async function logInWithMasqAppMock (stayConnected) {
+  // stop replication if logInWithMasqAppMock has already been called
+  mockMasqApp.destroy()
+
+  const link = await masq.getLoginLink()
+  const hashParams = getHashParams(link)
+
+  await Promise.all([
+    mockMasqApp.handleConnectionAuthorized(hashParams.channel, hashParams.key),
+    masq.logIntoMasq(stayConnected)
+  ])
+}
+
 beforeAll((done) => {
   server = signalserver()
   server.listen(8080, (err) => {
@@ -85,7 +98,7 @@ describe('localStorage and sessionStorage', () => {
   })
 })
 
-describe('Test mock functions', () => {
+describe('Mock functions', () => {
   test('dbExists should work as expected', async () => {
     expect(await dbExists('db1')).toBe(false)
     await createPromisifiedHyperDB('db1')
@@ -96,19 +109,6 @@ describe('Test mock functions', () => {
     expect(await dbExists('db1')).toBe(true)
   })
 })
-
-async function logInWithMasqAppMock (stayConnected) {
-  // stop replication if logInWithMasqAppMock has already been called
-  mockMasqApp.destroy()
-
-  const link = await masq.getLoginLink()
-  const hashParams = getHashParams(link)
-
-  await Promise.all([
-    mockMasqApp.handleConnectionAuthorized(hashParams.channel, hashParams.key),
-    masq.logIntoMasq(stayConnected)
-  ])
-}
 
 describe('Test login procedure', () => {
   test('should generate a pairing link', async () => {
