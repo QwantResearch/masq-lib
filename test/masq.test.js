@@ -23,20 +23,22 @@ jest.mock('random-access-idb', () =>
 
 jest.mock('masq-common', () => {
   const original = require.requireActual('masq-common')
-  let dbList = {}
-  let originalCreate = original.utils.createPromisifiedHyperDB
-  let modified = { ...original }
-  modified.utils.dbExists = (name) => {
-    return Promise.resolve(!!dbList[name])
+  const originalCreate = original.utils.createPromisifiedHyperDB
+  return {
+    ...original,
+    dbList: {},
+    utils: {
+      ...original.utils,
+      dbExists: (name) => Promise.resolve(!!this.dbList[name]),
+      createPromisifiedHyperDB: (name, hexKey) => {
+        this.dbList[name] = 'db'
+        return originalCreate(name, hexKey)
+      },
+      resetDbList: () => {
+        this.dbList = {}
+      }
+    }
   }
-  modified.utils.createPromisifiedHyperDB = (name, hexKey) => {
-    dbList[name] = 'db'
-    return originalCreate(name, hexKey)
-  }
-  modified.utils.resetDbList = () => {
-    dbList = {}
-  }
-  return modified
 })
 
 jest.setTimeout(30000)
