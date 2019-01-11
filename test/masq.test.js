@@ -110,7 +110,7 @@ describe('Mock functions', () => {
   })
 })
 
-describe('Test login procedure', () => {
+describe('Login procedure', () => {
   test('should generate a pairing link', async () => {
     const uuidSize = 36
     const link = await masq.getLoginLink()
@@ -124,7 +124,7 @@ describe('Test login procedure', () => {
   test('should join a channel', async () => {
     expect.assertions(1)
 
-    const pr = new Promise(async (resolve, reject) => {
+    const waitForPeer = new Promise(async (resolve, reject) => {
       const link = await masq.getLoginLink()
       const hashParams = getHashParams(link)
 
@@ -141,15 +141,15 @@ describe('Test login procedure', () => {
         resolve()
       })
     })
-    await Promise.all([pr, masq.logIntoMasq(false)])
+    await Promise.all([waitForPeer, masq.logIntoMasq(false)])
   })
 
-  test('should connect to Masq with key passed through url param', async () => {
+  test('isLoggedIn and isConnected should return true', async () => {
     expect(masq.isLoggedIn()).toBe(false)
-
+    expect(masq.isConnected()).toBe(false)
     await logInWithMasqAppMock(false)
-
     expect(masq.isLoggedIn()).toBe(true)
+    expect(masq.isConnected()).toBe(true)
   })
 
   test('should be able to connect with new Masq instance after logging in with stayConnected and disconnecting', async () => {
