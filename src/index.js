@@ -489,8 +489,7 @@ class Masq {
     const decList = await Promise.all(list.map(async (elt) => ({
       key: elt.key,
       value: await this._decryptValue(elt.value)
-    })
-    ))
+    })))
 
     const reformattedDic = decList.reduce((dic, e) => {
       const el = Array.isArray(e) ? e[0] : e
