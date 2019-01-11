@@ -507,7 +507,7 @@ describe('Login procedure', () => {
       const link = await masq.getLoginLink()
       const hashParams = getHashParams(link)
       // Extracted raw key is only a BUffer of bytes.
-      let extractedWrongKey = Buffer.from(genRandomBuffer(16))
+      const extractedWrongKey = Buffer.from(genRandomBuffer(16))
       await Promise.all([
         mockMasqApp.handleConnectionAuthorized(hashParams.channel, extractedWrongKey),
         masq.logIntoMasq(false)
@@ -600,30 +600,28 @@ describe('Test data access and input', () => {
     expect(res).toBeNull()
   })
 
-  test('should set a watcher', async (done) => {
-    expect.assertions(1)
-    const onChange = () => {
-      expect(true).toBe(true)
-      done()
-    }
+  test('should set a watcher', async () => {
+    let resolveOnChange
+    const waitForChange = new Promise((resolve) => { resolveOnChange = resolve })
+
     await logInWithMasqAppMock(false)
     const key = '/hello'
     const value = { data: 'world' }
-    masq.watch('/hello', onChange)
+    masq.watch('/hello', resolveOnChange)
     await masq.put(key, value)
+    await waitForChange
   })
 
   test('should be able to get a notif on change in masq-app with a watcher on masq-lib', async () => {
-    let resolvePrOnChangeMasqLib
-    const prOnChangeMasqLib = new Promise((resolve) => { resolvePrOnChangeMasqLib = resolve })
+    let resolveOnChange
+    const waitForChange = new Promise((resolve) => { resolveOnChange = resolve })
 
     await logInWithMasqAppMock(false)
     const key = '/hello'
     const value = { data: 'world' }
-    masq.watch('/hello', resolvePrOnChangeMasqLib)
+    masq.watch('/hello', resolveOnChange)
     await mockMasqApp.put(masq.userId, key, value)
-
-    await prOnChangeMasqLib
+    await waitForChange
   })
 })
 
@@ -632,15 +630,14 @@ describe('Test replication', () => {
     expect.assertions(1)
     await logInWithMasqAppMock(false)
 
-    let resolvePrOnChangeMockMasqApp
-    const prOnChangeMockMasqApp = new Promise((resolve) => { resolvePrOnChangeMockMasqApp = resolve })
-    mockMasqApp.watch(masq.userId, '/hello', resolvePrOnChangeMockMasqApp)
+    let resolveOnChange
+    const waitForChange = new Promise((resolve) => { resolveOnChange = resolve })
+    mockMasqApp.watch(masq.userId, '/hello', resolveOnChange)
 
     const key = '/hello'
     const value = { data: 'world' }
     await masq.put(key, value)
-
-    await prOnChangeMockMasqApp
+    await waitForChange
     const res = await mockMasqApp.get(masq.userId, '/hello')
     expect(res).toEqual(value)
   })
