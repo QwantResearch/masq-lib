@@ -36,19 +36,17 @@ jest.mock('masq-common', () => {
   return modified
 })
 
+jest.setTimeout(30000)
+
 let server = null
 let masq = null
 let mockMasqApp = null
 
-jest.setTimeout(30000)
-
-beforeAll(async () => {
+beforeAll((done) => {
   server = signalserver()
-  await new Promise((resolve) => {
-    server.listen(8080, (err) => {
-      if (err) throw err
-      resolve()
-    })
+  server.listen(8080, (err) => {
+    if (err) throw err
+    done()
   })
 })
 
