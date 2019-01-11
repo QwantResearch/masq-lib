@@ -128,7 +128,7 @@ class Masq {
     // If userId is in sesssion storage, use it and do not touch localStorage
     const sessionUserId = window.sessionStorage.getItem('userId')
     const sessionDataEncryptionKey = window.sessionStorage.getItem('dataEncryptionKey')
-    if (sessionUserId && sessionDataEncryptionKey) {
+    if (sessionUserId) {
       this.userId = sessionUserId
       this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(sessionDataEncryptionKey, 'hex'))
       return
@@ -140,9 +140,7 @@ class Masq {
     if (localStorageUserId) {
       this.userId = localStorageUserId
       window.sessionStorage.setItem('userId', this.userId)
-    }
-    const localStorageDataEncryptionKey = window.localStorage.getItem('dataEncryptionKey')
-    if (localStorageDataEncryptionKey) {
+      const localStorageDataEncryptionKey = window.localStorage.getItem('dataEncryptionKey')
       this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(localStorageDataEncryptionKey, 'hex'))
       window.sessionStorage.setItem('dataEncryptionKey', localStorageDataEncryptionKey)
     }
@@ -451,9 +449,7 @@ class Masq {
     const node = await db.getAsync(key)
     if (!node) return null
     const dec = await this._decryptValue(node.value)
-    // console.log(dec)
     return dec
-    // return node.value
   }
 
   /**
@@ -466,7 +462,6 @@ class Masq {
     const db = this._getDB()
     this._checkDEK()
     const enc = await this._encryptValue(value)
-    // console.log(enc, value)
     return db.putAsync(key, enc)
   }
 
