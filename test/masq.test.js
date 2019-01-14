@@ -546,6 +546,24 @@ describe('Test data access and input', () => {
     expect(res).toEqual(value)
   })
 
+  // By default hyperDB list method returns key="" value=null if no put has been done
+  test('list should return [] if empty (with no parameter)', async () => {
+    expect.assertions(1)
+    await logInWithMasqAppMock(false)
+    const res = await masq.list()
+
+    expect(res).toHaveLength(0)
+  })
+
+  // By default hyperDB list method returns key="" value=null if no put has been done
+  test('list should return [] if empty (with "/" as parameter)', async () => {
+    expect.assertions(1)
+    await logInWithMasqAppMock(false)
+    const res = await masq.list()
+
+    expect(res).toHaveLength(0)
+  })
+
   test('list should get every put items', async () => {
     expect.assertions(1)
     await logInWithMasqAppMock(false)
@@ -560,11 +578,13 @@ describe('Test data access and input', () => {
     )
     await Promise.all(promiseArr)
     await masq.del('hello2')
-    const res = await masq.list()
+    const res = await masq.list('/')
+
     const expected = Object.keys(keyValues).reduce((dic, k) => {
       if (k !== 'hello2') dic[k] = keyValues[k]
       return dic
     }, {})
+
     expect(res).toEqual(expected)
   })
 

@@ -14,7 +14,7 @@ const debug = (function () {
     case ('development'):
       return console.log
     default:
-      return () => {}
+      return () => { }
   }
 })()
 
@@ -485,7 +485,13 @@ class Masq {
   async list (prefix) {
     const db = this._getDB()
     this._checkDEK()
+
     const list = await db.listAsync(prefix)
+
+    if (list.length === 1 && list[0].key === '' && list[0].value === null) {
+      return []
+    }
+    // if (list.length === 1 && list[0].key === "" && list[0].value=null) return []
 
     const decList = await Promise.all(list.map(async (elt) => ({
       key: elt.key,
