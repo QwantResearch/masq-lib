@@ -76,6 +76,7 @@ class Masq {
 
     const db = common.utils.createPromisifiedHyperDB(this.userId)
     this.userAppDb = db
+    // @@1
     await common.utils.dbReady(db)
     this._startReplication()
   }
@@ -351,6 +352,9 @@ class Masq {
         case 'masqAccessGranted':
           registering = false
 
+          userId = json.userAppDbId
+          dataEncryptionKey = json.userAppDEK
+
           const buffKey = Buffer.from(json.key, 'hex')
           db = common.utils.createPromisifiedHyperDB(userId, buffKey)
           await common.utils.dbReady(db)
@@ -371,6 +375,7 @@ class Masq {
           this._storeSessionInfo(stayConnected, userId, dataEncryptionKey)
           this.userId = userId
           this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
+
           this.userAppDb = db
           this._startReplication()
 
