@@ -27,7 +27,7 @@
     "uuid": "^3.3.2",
     "webrtc-swarm": "git+https://github.com/QwantResearch/webrtc-swarm#masq",
     "wrtc": "^0.2.1",
-    "masq-common": "git+https://github.com/QwantResearch/masq-common"
+    "masq-common": "git+https://github.com/QwantResearch/masq-common#4054289441c24fa81c11d72aa7daa192332ea96f"
   },
   "devDependencies": {
     "@trust/webcrypto": "^0.9.2",
