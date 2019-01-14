@@ -13,7 +13,7 @@
     "type": "git",
     "url": "git+https://github.com/QwantResearch/masq-lib.git"
   },
-  "author": "",
+  "author": "Qwant Research",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/QwantResearch/masq-lib/issues"
