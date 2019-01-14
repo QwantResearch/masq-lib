@@ -547,21 +547,21 @@ describe('Test data access and input', () => {
   })
 
   // By default hyperDB list method returns key="" value=null if no put has been done
-  test('list should return [] if empty (with no parameter)', async () => {
+  test('list should return {} if empty (with no parameter)', async () => {
     expect.assertions(1)
     await logInWithMasqAppMock(false)
     const res = await masq.list()
 
-    expect(res).toHaveLength(0)
+    expect(res).toEqual({})
   })
 
   // By default hyperDB list method returns key="" value=null if no put has been done
-  test('list should return [] if empty (with "/" as parameter)', async () => {
+  test('list should return {} if empty (with "/" as parameter)', async () => {
     expect.assertions(1)
     await logInWithMasqAppMock(false)
     const res = await masq.list()
 
-    expect(res).toHaveLength(0)
+    expect(res).toEqual({})
   })
 
   test('list should get every put items', async () => {

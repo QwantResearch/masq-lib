@@ -222,7 +222,7 @@ class Masq {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'User Id not found in \'authorized\' message')
         }
         if (!json.userAppDEK) {
-          handleError('User app dataEncryptionKey (userAppDEK) not found in \'authorized\' message')
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'User app dataEncryptionKey (userAppDEK) not found in \'authorized\' message')
         }
         break
 
@@ -242,7 +242,7 @@ class Masq {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'User Id not found in "masqAccessGranted" message')
         }
         if (!json.userAppDEK) {
-          handleError('User app dataEncryptionKey (userAppDEK) not found in "masqAccessGranted" message')
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'User app dataEncryptionKey (userAppDEK) not found in "masqAccessGranted" message')
         }
         break
 
@@ -420,16 +420,6 @@ class Masq {
     if (!this.dataEncryptionKey) throw Error('Data encryption key is not set')
   }
 
-  async _decryptValue (ciphertext) {
-    let decryptedMsg = await common.crypto.decrypt(this.dataEncryptionKey, ciphertext)
-    return decryptedMsg
-  }
-
-  async _encryptValue (plaintext) {
-    let encryptedMsg = await common.crypto.encrypt(this.dataEncryptionKey, plaintext)
-    return encryptedMsg
-  }
-
   /**
    * Set a watcher
    * @param {string} key - Key
@@ -447,9 +437,7 @@ class Masq {
    */
   async get (key) {
     const db = this._getDB()
-    const node = await db.getAsync(key)
-    if (!node) return null
-    const dec = await this._decryptValue(node.value)
+    const dec = await common.utils.get(db, this.dataEncryptionKey, key)
     return dec
   }
 
@@ -461,9 +449,7 @@ class Masq {
    */
   async put (key, value) {
     const db = this._getDB()
-    this._checkDEK()
-    const enc = await this._encryptValue(value)
-    return db.putAsync(key, enc)
+    return common.utils.put(db, this.dataEncryptionKey, key, value)
   }
 
   /**
@@ -486,24 +472,8 @@ class Masq {
     const db = this._getDB()
     this._checkDEK()
 
-    const list = await db.listAsync(prefix)
-
-    if (list.length === 1 && list[0].key === '' && list[0].value === null) {
-      return []
-    }
-    // if (list.length === 1 && list[0].key === "" && list[0].value=null) return []
-
-    const decList = await Promise.all(list.map(async (elt) => ({
-      key: elt.key,
-      value: await this._decryptValue(elt.value)
-    })))
-
-    const reformattedDic = decList.reduce((dic, e) => {
-      const el = Array.isArray(e) ? e[0] : e
-      dic[el.key] = el.value
-      return dic
-    }, {})
-    return reformattedDic
+    const list = await common.utils.list(db, this.dataEncryptionKey, prefix)
+    return list
   }
 }
 
