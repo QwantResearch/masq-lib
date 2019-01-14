@@ -152,6 +152,12 @@ describe('Login procedure', () => {
     expect(masq.isConnected()).toBe(true)
   })
 
+  test('should fail to connect without logging in', async () => {
+    const masq = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL)
+    expect(masq.isLoggedIn()).toBe(false)
+    expect(masq.isConnected()).toBe(false)
+  })
+
   test('should be able to connect with new Masq instance after logging in with stayConnected and disconnecting', async () => {
     expect(masq.isLoggedIn()).toBe(false)
     await logInWithMasqAppMock(true)
@@ -161,7 +167,6 @@ describe('Login procedure', () => {
     await masq.put(key, value)
     const res = await masq.get(key)
     expect(res).toEqual(value)
-
     expect(masq.isLoggedIn()).toBe(true)
     await masq._disconnect()
     expect(masq.isLoggedIn()).toBe(true)
@@ -181,12 +186,6 @@ describe('Login procedure', () => {
 
     // signout
     await masq2.signout()
-
-    // fail to reconnect without logging in
-    const masq3 = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL)
-    expect(masq3.isLoggedIn()).toBe(false)
-    expect(masq3.isConnected()).toBe(false)
-    await masq3.signout()
   })
 
   test('should not be able to connect with new Masq instance after logging in without stayConnected and disconnecting', async () => {
