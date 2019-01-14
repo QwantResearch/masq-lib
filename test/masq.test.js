@@ -144,6 +144,11 @@ describe('Login procedure', () => {
     await Promise.all([waitForPeer, masq.logIntoMasq(false)])
   })
 
+  test('isLoggedIn and isConnected should return false', async () => {
+    expect(masq.isLoggedIn()).toBe(false)
+    expect(masq.isConnected()).toBe(false)
+  })
+
   test('isLoggedIn and isConnected should return true', async () => {
     expect(masq.isLoggedIn()).toBe(false)
     expect(masq.isConnected()).toBe(false)
@@ -152,8 +157,11 @@ describe('Login procedure', () => {
     expect(masq.isConnected()).toBe(true)
   })
 
-  test('should fail to connect without logging in', async () => {
-    const masq = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL)
+  test('should login and signout correctly', async () => {
+    await logInWithMasqAppMock(true)
+    expect(masq.isLoggedIn()).toBe(true)
+    expect(masq.isConnected()).toBe(true)
+    await masq.signout()
     expect(masq.isLoggedIn()).toBe(false)
     expect(masq.isConnected()).toBe(false)
   })
@@ -233,11 +241,6 @@ describe('Login procedure', () => {
 
     // signout with masq2
     await masq2.signout()
-
-    const masq3 = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL)
-    expect(masq3.isLoggedIn()).toBe(false)
-    expect(masq3.isConnected()).toBe(false)
-    await masq3.signout()
   })
 
   test('should be able to put and get values after connect', async () => {
