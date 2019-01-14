@@ -22,7 +22,7 @@
   "dependencies": {
     "bluebird": "^3.5.3",
     "hyperdb": "^3.5.0",
-    "masq-common": "git+https://github.com/QwantResearch/masq-common",
+    "masq-common": "git+https://github.com/QwantResearch/masq-common.git",
     "random-access-idb": "^1.0.4",
     "signalhubws": "^1.0.7",
     "uuid": "^3.3.2",
