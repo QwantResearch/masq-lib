@@ -539,6 +539,34 @@ describe('Login procedure', () => {
 // TODO add tests for connect-disconnect-connect
 
 describe('Test data access and input', () => {
+  test('operations should fail if masq is not connected', async () => {
+    const functions = [ 'watch' ]
+    const promises = [
+      masq.get('key'),
+      masq.put('key', 'value'),
+      masq.del('key'),
+      masq.list('/')
+    ]
+
+    expect.assertions(promises.length + functions.length)
+
+    promises.forEach(async (p) => {
+      try {
+        await p
+      } catch (e) {
+        expect(e.message).toBe('Not connected to Masq')
+      }
+    })
+
+    functions.forEach(f => {
+      try {
+        masq[f]()
+      } catch (e) {
+        expect(e.message).toBe('Not connected to Masq')
+      }
+    })
+  })
+
   test('put/get should put and get an item', async () => {
     expect.assertions(1)
     await logInWithMasqAppMock(false)
