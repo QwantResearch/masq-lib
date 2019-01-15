@@ -316,8 +316,8 @@ describe('Login procedure', () => {
     expect(masq.isConnected()).toBe(false)
   })
 
-  test('should be able to disconnect more than once without error', async () => {
-    expect.assertions(7)
+  test('should be able to disconnect more than once, then reconnect without error', async () => {
+    expect.assertions(9)
     expect(masq.isLoggedIn()).toBe(false)
 
     await logInWithMasqAppMock(false)
@@ -331,6 +331,10 @@ describe('Login procedure', () => {
     await masq._disconnect()
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(false)
+
+    await masq.connectToMasq()
+    expect(masq.isLoggedIn()).toBe(true)
+    expect(masq.isConnected()).toBe(true)
   })
 
   test('should be able to connect more than once without error', async () => {
