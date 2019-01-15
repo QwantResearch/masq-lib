@@ -554,7 +554,7 @@ describe('Test data access and input', () => {
       try {
         await p
       } catch (e) {
-        expect(e.message).toBe('Not connected to Masq')
+        expect(e.type).toBe(ERRORS.NOT_CONNECTED)
       }
     })
 
@@ -562,7 +562,7 @@ describe('Test data access and input', () => {
       try {
         masq[f]()
       } catch (e) {
-        expect(e.message).toBe('Not connected to Masq')
+        expect(e.type).toBe(ERRORS.NOT_CONNECTED)
       }
     })
   })
