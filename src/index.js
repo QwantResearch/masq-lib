@@ -14,7 +14,7 @@ const debug = (function () {
     case ('development'):
       return console.log
     default:
-      return () => {}
+      return () => { }
   }
 })()
 
@@ -38,6 +38,7 @@ class Masq {
     this.appImageURL = appImageURL
 
     this.userId = null
+    this.dataEncryptionKey = null
     this.userAppDb = null
 
     this._loadSessionInfo()
@@ -75,6 +76,7 @@ class Masq {
 
     const db = common.utils.createPromisifiedHyperDB(this.userId)
     this.userAppDb = db
+    // @@1
     await common.utils.dbReady(db)
     this._startReplication()
   }
@@ -108,22 +110,29 @@ class Masq {
   _deleteSessionInfo (deleteLocal) {
     if (deleteLocal) {
       window.localStorage.removeItem('userId')
+      window.localStorage.removeItem('dataEncryptionKey')
     }
     window.sessionStorage.removeItem('userId')
+    window.sessionStorage.removeItem('dataEncryptionKey')
   }
 
-  _storeSessionInfo (stayConnected, userId) {
+  _storeSessionInfo (stayConnected, userId, dataEncryptionKey) {
     if (stayConnected) {
       window.localStorage.setItem('userId', userId)
+      window.localStorage.setItem('dataEncryptionKey', dataEncryptionKey)
     }
     window.sessionStorage.setItem('userId', userId)
+    window.sessionStorage.setItem('dataEncryptionKey', dataEncryptionKey)
   }
 
-  _loadSessionInfo () {
+  async _loadSessionInfo () {
     // If userId is in sesssion storage, use it and do not touch localStorage
     const sessionUserId = window.sessionStorage.getItem('userId')
+    const sessionDataEncryptionKey = window.sessionStorage.getItem('dataEncryptionKey')
+
     if (sessionUserId) {
       this.userId = sessionUserId
+      this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(sessionDataEncryptionKey, 'hex'))
       return
     }
 
@@ -133,6 +142,9 @@ class Masq {
     if (localStorageUserId) {
       this.userId = localStorageUserId
       window.sessionStorage.setItem('userId', this.userId)
+      const localStorageDataEncryptionKey = window.localStorage.getItem('dataEncryptionKey')
+      this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(localStorageDataEncryptionKey, 'hex'))
+      window.sessionStorage.setItem('dataEncryptionKey', localStorageDataEncryptionKey)
     }
   }
 
@@ -210,6 +222,9 @@ class Masq {
         if (!json.userAppDbId) {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'User Id not found in \'authorized\' message')
         }
+        if (!json.userAppDEK) {
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'User app dataEncryptionKey (userAppDEK) not found in \'authorized\' message')
+        }
         break
 
       case 'notAuthorized':
@@ -226,6 +241,9 @@ class Masq {
 
         if (!json.userAppDbId) {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'User Id not found in "masqAccessGranted" message')
+        }
+        if (!json.userAppDEK) {
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'User app dataEncryptionKey (userAppDEK) not found in "masqAccessGranted" message')
         }
         break
 
@@ -283,6 +301,7 @@ class Masq {
 
     let userId
     let db
+    let dataEncryptionKey
 
     const handleData = async (sw, peer, data) => {
       const handleError = (err) => {
@@ -303,12 +322,15 @@ class Masq {
       switch (json.msg) {
         case 'authorized':
           userId = json.userAppDbId
+          dataEncryptionKey = json.userAppDEK
 
           // Check if the User-app is already registered
           if (await this._isRegistered(userId)) {
             this.userId = userId
+            // store the dataEncryptionKey as a CryptoKey
+            this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
             // Store the session info
-            this._storeSessionInfo(stayConnected, userId)
+            this._storeSessionInfo(stayConnected, userId, dataEncryptionKey)
 
             await this.connectToMasq()
             // logged into Masq
@@ -316,7 +338,6 @@ class Masq {
             sw.close()
             return
           }
-
           // if this UserApp instance is not registered
           registering = true
           this._requestUserAppRegister(key, peer)
@@ -330,6 +351,9 @@ class Masq {
 
         case 'masqAccessGranted':
           registering = false
+
+          userId = json.userAppDbId
+          dataEncryptionKey = json.userAppDEK
 
           const buffKey = Buffer.from(json.key, 'hex')
           db = common.utils.createPromisifiedHyperDB(userId, buffKey)
@@ -348,8 +372,10 @@ class Masq {
           waitingForWriteAccess = false
 
           // Store the session info
-          this._storeSessionInfo(stayConnected, userId)
+          this._storeSessionInfo(stayConnected, userId, dataEncryptionKey)
           this.userId = userId
+          this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
+
           this.userAppDb = db
           this._startReplication()
 
@@ -395,6 +421,10 @@ class Masq {
     return this.userAppDb
   }
 
+  _checkDEK () {
+    if (!this.dataEncryptionKey) throw Error('Data encryption key is not set')
+  }
+
   /**
    * Set a watcher
    * @param {string} key - Key
@@ -412,9 +442,8 @@ class Masq {
    */
   async get (key) {
     const db = this._getDB()
-    const node = await db.getAsync(key)
-    if (!node) return null
-    return node.value
+    const dec = await common.utils.get(db, this.dataEncryptionKey, key)
+    return dec
   }
 
   /**
@@ -425,7 +454,7 @@ class Masq {
    */
   async put (key, value) {
     const db = this._getDB()
-    return db.putAsync(key, value)
+    return common.utils.put(db, this.dataEncryptionKey, key, value)
   }
 
   /**
@@ -435,6 +464,7 @@ class Masq {
    */
   async del (key) {
     const db = this._getDB()
+    this._checkDEK()
     return db.delAsync(key)
   }
 
@@ -445,13 +475,10 @@ class Masq {
    */
   async list (prefix) {
     const db = this._getDB()
-    const list = await db.listAsync(prefix)
-    const reformattedDic = list.reduce((dic, e) => {
-      const el = Array.isArray(e) ? e[0] : e
-      dic[el.key] = el.value
-      return dic
-    }, {})
-    return reformattedDic
+    this._checkDEK()
+
+    const list = await common.utils.list(db, this.dataEncryptionKey, prefix)
+    return list
   }
 }
 
