@@ -56,9 +56,10 @@ afterAll((done) => {
   server.close(done)
 })
 
-beforeEach(() => {
+beforeEach(async () => {
   masq = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL)
   mockMasqApp = new MasqAppMock()
+  await mockMasqApp.init()
 })
 
 afterEach(async () => {
@@ -152,7 +153,6 @@ describe('Test login procedure', () => {
 
   test('should be able to connect with new Masq instance after logging in with stayConnected and disconnecting', async () => {
     expect(masq.isLoggedIn()).toBe(false)
-
     await logInWithMasqAppMock(true)
 
     const key = '/hello'
@@ -546,6 +546,24 @@ describe('Test data access and input', () => {
     expect(res).toEqual(value)
   })
 
+  // By default hyperDB list method returns key="" value=null if no put has been done
+  test('list should return {} if empty (with no parameter)', async () => {
+    expect.assertions(1)
+    await logInWithMasqAppMock(false)
+    const res = await masq.list()
+
+    expect(res).toEqual({})
+  })
+
+  // By default hyperDB list method returns key="" value=null if no put has been done
+  test('list should return {} if empty (with "/" as parameter)', async () => {
+    expect.assertions(1)
+    await logInWithMasqAppMock(false)
+    const res = await masq.list()
+
+    expect(res).toEqual({})
+  })
+
   test('list should get every put items', async () => {
     expect.assertions(1)
     await logInWithMasqAppMock(false)
@@ -560,11 +578,13 @@ describe('Test data access and input', () => {
     )
     await Promise.all(promiseArr)
     await masq.del('hello2')
-    const res = await masq.list()
+    const res = await masq.list('/')
+
     const expected = Object.keys(keyValues).reduce((dic, k) => {
       if (k !== 'hello2') dic[k] = keyValues[k]
       return dic
     }, {})
+
     expect(res).toEqual(expected)
   })
 
