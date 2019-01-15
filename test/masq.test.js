@@ -149,7 +149,7 @@ describe('Login procedure', () => {
     expect(masq.isConnected()).toBe(false)
   })
 
-  test('isLoggedIn and isConnected should return true', async () => {
+  test('isLoggedIn and isConnected should return true after successful login', async () => {
     expect(masq.isLoggedIn()).toBe(false)
     expect(masq.isConnected()).toBe(false)
     await logInWithMasqAppMock(false)
@@ -158,6 +158,8 @@ describe('Login procedure', () => {
   })
 
   test('should login and signout correctly', async () => {
+    expect(masq.isLoggedIn()).toBe(false)
+    expect(masq.isConnected()).toBe(false)
     await logInWithMasqAppMock(true)
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(true)
@@ -243,43 +245,17 @@ describe('Login procedure', () => {
     await masq2.signout()
   })
 
-  test('should be able to put and get values after connect', async () => {
-    expect(masq.isLoggedIn()).toBe(false)
-
-    await logInWithMasqAppMock(false)
-
-    const key = '/hello'
-    const value = { data: 'world' }
-    await masq.put(key, value)
-    const res = await masq.get('/hello')
-    expect(res).toEqual(value)
-
-    expect(masq.isLoggedIn()).toBe(true)
-  })
-
   test('should be able to repeat login-disconnect-connect-signout', async () => {
     expect(masq.isLoggedIn()).toBe(false)
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 2; i++) {
       await logInWithMasqAppMock(false)
       expect(masq.isLoggedIn()).toBe(true)
       expect(masq.isConnected()).toBe(true)
 
-      const key = '/hello'
-      const value = { data: 'world' }
-      await masq.put(key, value)
-      const res = await masq.get('/hello')
-      expect(res).toEqual(value)
-
       await masq._disconnect()
       expect(masq.isLoggedIn()).toBe(true)
       expect(masq.isConnected()).toBe(false)
-
-      try {
-        await masq.put(key, value)
-      } catch (err) {
-        expect(err.type).toEqual(ERRORS.NOT_CONNECTED)
-      }
 
       await masq.connectToMasq()
       expect(masq.isLoggedIn()).toBe(true)
@@ -292,7 +268,7 @@ describe('Login procedure', () => {
   })
 
   test('should fail when connect without prior login', async () => {
-    expect.assertions(12)
+    expect.assertions(4)
     expect(masq.isLoggedIn()).toBe(false)
 
     try {
@@ -302,22 +278,6 @@ describe('Login procedure', () => {
       expect(masq.isLoggedIn()).toBe(false)
       expect(masq.isConnected()).toBe(false)
     }
-
-    await logInWithMasqAppMock(false)
-    expect(masq.isLoggedIn()).toBe(true)
-    expect(masq.isConnected()).toBe(true)
-
-    await masq._disconnect()
-    expect(masq.isLoggedIn()).toBe(true)
-    expect(masq.isConnected()).toBe(false)
-
-    await masq.connectToMasq()
-    expect(masq.isLoggedIn()).toBe(true)
-    expect(masq.isConnected()).toBe(true)
-
-    await masq.signout()
-    expect(masq.isLoggedIn()).toBe(false)
-    expect(masq.isConnected()).toBe(false)
   })
 
   test('should fail when connect after signout without prior login', async () => {
@@ -340,6 +300,7 @@ describe('Login procedure', () => {
     expect(masq.isLoggedIn()).toBe(false)
     expect(masq.isConnected()).toBe(false)
 
+    // Trying to reconnect without login should fail
     try {
       await masq.connectToMasq()
     } catch (err) {
@@ -349,40 +310,17 @@ describe('Login procedure', () => {
     }
   })
 
-  test('should be able to disconnect even if not logged in or connected', async () => {
-    expect(masq.isLoggedIn()).toBe(false)
-
-    await masq._disconnect()
+  test('should be able to disconnect even if not logged in nor connected', async () => {
     expect(masq.isLoggedIn()).toBe(false)
     expect(masq.isConnected()).toBe(false)
-
-    await logInWithMasqAppMock(false)
-    expect(masq.isLoggedIn()).toBe(true)
-    expect(masq.isConnected()).toBe(true)
-
     await masq._disconnect()
-    expect(masq.isLoggedIn()).toBe(true)
-    expect(masq.isConnected()).toBe(false)
-
-    await masq.connectToMasq()
-    expect(masq.isLoggedIn()).toBe(true)
-    expect(masq.isConnected()).toBe(true)
-
-    await masq.signout()
     expect(masq.isLoggedIn()).toBe(false)
     expect(masq.isConnected()).toBe(false)
   })
 
   test('should be able to disconnect more than once without error', async () => {
+    expect.assertions(7)
     expect(masq.isLoggedIn()).toBe(false)
-
-    try {
-      await masq.connectToMasq()
-    } catch (err) {
-      expect(err.type).toBe(ERRORS.NOT_LOGGED_IN)
-      expect(masq.isLoggedIn()).toBe(false)
-      expect(masq.isConnected()).toBe(false)
-    }
 
     await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).toBe(true)
@@ -394,14 +332,6 @@ describe('Login procedure', () => {
 
     await masq._disconnect()
     expect(masq.isLoggedIn()).toBe(true)
-    expect(masq.isConnected()).toBe(false)
-
-    await masq.connectToMasq()
-    expect(masq.isLoggedIn()).toBe(true)
-    expect(masq.isConnected()).toBe(true)
-
-    await masq.signout()
-    expect(masq.isLoggedIn()).toBe(false)
     expect(masq.isConnected()).toBe(false)
   })
 
@@ -423,10 +353,6 @@ describe('Login procedure', () => {
     await masq.connectToMasq()
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(true)
-
-    await masq.signout()
-    expect(masq.isLoggedIn()).toBe(false)
-    expect(masq.isConnected()).toBe(false)
   })
 
   test('should be able to sign out more than once without error', async () => {
@@ -436,14 +362,6 @@ describe('Login procedure', () => {
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(true)
 
-    await masq._disconnect()
-    expect(masq.isLoggedIn()).toBe(true)
-    expect(masq.isConnected()).toBe(false)
-
-    await masq.connectToMasq()
-    expect(masq.isLoggedIn()).toBe(true)
-    expect(masq.isConnected()).toBe(true)
-
     await masq.signout()
     expect(masq.isLoggedIn()).toBe(false)
     expect(masq.isConnected()).toBe(false)
@@ -451,10 +369,6 @@ describe('Login procedure', () => {
     await masq.signout()
     expect(masq.isLoggedIn()).toBe(false)
     expect(masq.isConnected()).toBe(false)
-
-    await logInWithMasqAppMock(false)
-    expect(masq.isLoggedIn()).toBe(true)
-    expect(masq.isConnected()).toBe(true)
   })
 
   test('should be able to login more than once without error', async () => {
@@ -467,22 +381,6 @@ describe('Login procedure', () => {
     await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).toBe(true)
     expect(masq.isConnected()).toBe(true)
-
-    await logInWithMasqAppMock(false)
-    expect(masq.isLoggedIn()).toBe(true)
-    expect(masq.isConnected()).toBe(true)
-
-    await masq._disconnect()
-    expect(masq.isLoggedIn()).toBe(true)
-    expect(masq.isConnected()).toBe(false)
-
-    await masq.connectToMasq()
-    expect(masq.isLoggedIn()).toBe(true)
-    expect(masq.isConnected()).toBe(true)
-
-    await masq.signout()
-    expect(masq.isLoggedIn()).toBe(false)
-    expect(masq.isConnected()).toBe(false)
   })
 
   test('should be kicked if key is invalid', async () => {
