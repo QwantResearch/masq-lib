@@ -141,6 +141,7 @@ describe('Login procedure', () => {
         resolve()
       })
     })
+
     await Promise.all([waitForPeer, masq.logIntoMasq(false)])
   })
 
@@ -199,7 +200,7 @@ describe('Login procedure', () => {
   })
 
   test('should not be able to connect with new Masq instance after logging in without stayConnected and disconnecting', async () => {
-    expect.assertions(12)
+    let err
 
     expect(masq.isLoggedIn()).toBe(false)
     await logInWithMasqAppMock(false)
@@ -214,9 +215,10 @@ describe('Login procedure', () => {
     expect(masq2.isConnected()).toBe(false)
     try {
       await masq2.connectToMasq()
-    } catch (err) {
-      expect(err.type).toBe(ERRORS.NOT_LOGGED_IN)
+    } catch (e) {
+      err = e
     }
+    expect(err.type).toBe(ERRORS.NOT_LOGGED_IN)
     expect(masq2.isLoggedIn()).toBe(false)
     expect(masq2.isConnected()).toBe(false)
 
@@ -266,20 +268,24 @@ describe('Login procedure', () => {
   })
 
   test('should fail when connect without prior login', async () => {
-    expect.assertions(4)
+    let err
+
     expect(masq.isLoggedIn()).toBe(false)
 
     try {
       await masq.connectToMasq()
-    } catch (err) {
-      expect(err.type).toBe(ERRORS.NOT_LOGGED_IN)
-      expect(masq.isLoggedIn()).toBe(false)
-      expect(masq.isConnected()).toBe(false)
+    } catch (e) {
+      err = e
     }
+
+    expect(err.type).toBe(ERRORS.NOT_LOGGED_IN)
+    expect(masq.isLoggedIn()).toBe(false)
+    expect(masq.isConnected()).toBe(false)
   })
 
   test('should fail when connect after signout without prior login', async () => {
-    expect.assertions(12)
+    let err
+
     expect(masq.isLoggedIn()).toBe(false)
 
     await logInWithMasqAppMock(false)
@@ -301,11 +307,13 @@ describe('Login procedure', () => {
     // Trying to reconnect without login should fail
     try {
       await masq.connectToMasq()
-    } catch (err) {
-      expect(err.type).toBe(ERRORS.NOT_LOGGED_IN)
-      expect(masq.isLoggedIn()).toBe(false)
-      expect(masq.isConnected()).toBe(false)
+    } catch (e) {
+      err = e
     }
+
+    expect(err.type).toBe(ERRORS.NOT_LOGGED_IN)
+    expect(masq.isLoggedIn()).toBe(false)
+    expect(masq.isConnected()).toBe(false)
   })
 
   test('should be able to disconnect even if not logged in nor connected', async () => {
@@ -317,7 +325,6 @@ describe('Login procedure', () => {
   })
 
   test('should be able to disconnect more than once, then reconnect without error', async () => {
-    expect.assertions(9)
     expect(masq.isLoggedIn()).toBe(false)
 
     await logInWithMasqAppMock(false)
@@ -386,24 +393,26 @@ describe('Login procedure', () => {
   })
 
   test('should be kicked if key is invalid', async () => {
-    expect.assertions(2)
-
     const link = await masq.getLoginLink()
     const hashParams = getHashParams(link)
     const invalidKey = 'wrongChallenge'
+    let err
+
     try {
       await Promise.all([
         mockMasqApp.handleConnectionAuthorized(hashParams.channel, invalidKey),
         masq.logIntoMasq(false)
       ])
-    } catch (err) {
-      expect(err).toBeDefined()
-      expect(err.type).toBe(ERRORS.INVALID_KEY)
+    } catch (e) {
+      err = e
     }
+
+    expect(err).toBeDefined()
+    expect(err.type).toBe(ERRORS.INVALID_KEY)
   })
 
   test('should be kicked if wrong key is used', async () => {
-    expect.assertions(2)
+    let err
 
     try {
       const link = await masq.getLoginLink()
@@ -414,24 +423,29 @@ describe('Login procedure', () => {
         mockMasqApp.handleConnectionAuthorized(hashParams.channel, extractedWrongKey),
         masq.logIntoMasq(false)
       ])
-    } catch (err) {
-      expect(err).toBeDefined()
-      expect(err.type).toBe(ERRORS.UNABLE_TO_DECRYPT)
+    } catch (e) {
+      err = e
     }
+
+    expect(err).toBeDefined()
+    expect(err.type).toBe(ERRORS.UNABLE_TO_DECRYPT)
   })
 
   test('should fail when register is refused', async () => {
     const link = await masq.getLoginLink()
     const hashParams = getHashParams(link)
-    expect.assertions(1)
+    let err
+
     try {
       await Promise.all([
         mockMasqApp.handleConnectionRegisterRefused(hashParams.channel, hashParams.key),
         masq.logIntoMasq(false)
       ])
     } catch (e) {
-      expect(e.type).toBe(ERRORS.MASQ_ACCESS_REFUSED_BY_USER)
+      err = e
     }
+
+    expect(err.type).toBe(ERRORS.MASQ_ACCESS_REFUSED_BY_USER)
   })
 })
 
@@ -447,28 +461,28 @@ describe('Test data access and input', () => {
       masq.del('key'),
       masq.list('/')
     ]
-
-    expect.assertions(promises.length + functions.length)
+    let err
 
     promises.forEach(async (p) => {
       try {
         await p
       } catch (e) {
-        expect(e.type).toBe(ERRORS.NOT_CONNECTED)
+        err = e
       }
+      expect(err.type).toBe(ERRORS.NOT_CONNECTED)
     })
 
     functions.forEach(f => {
       try {
         masq[f]()
       } catch (e) {
-        expect(e.type).toBe(ERRORS.NOT_CONNECTED)
+        err = e
       }
+      expect(err.type).toBe(ERRORS.NOT_CONNECTED)
     })
   })
 
   test('put/get should put and get an item', async () => {
-    expect.assertions(1)
     await logInWithMasqAppMock(false)
     const key = '/hello'
     const value = { data: 'world' }
@@ -479,24 +493,19 @@ describe('Test data access and input', () => {
 
   // By default hyperDB list method returns key="" value=null if no put has been done
   test('list should return {} if empty (with no parameter)', async () => {
-    expect.assertions(1)
     await logInWithMasqAppMock(false)
     const res = await masq.list()
-
     expect(res).toEqual({})
   })
 
   // By default hyperDB list method returns key="" value=null if no put has been done
   test('list should return {} if empty (with "/" as parameter)', async () => {
-    expect.assertions(1)
     await logInWithMasqAppMock(false)
     const res = await masq.list()
-
     expect(res).toEqual({})
   })
 
   test('list should get every put items', async () => {
-    expect.assertions(1)
     await logInWithMasqAppMock(false)
     const keyValues = {
       'hello': { data: 'world' },
@@ -520,7 +529,6 @@ describe('Test data access and input', () => {
   })
 
   test('del should del an item', async () => {
-    expect.assertions(1)
     await logInWithMasqAppMock(false)
     const key = '/hello'
     const value = { data: 'world' }
@@ -557,7 +565,6 @@ describe('Test data access and input', () => {
 
 describe('Test replication', () => {
   test('put/get should put an item and get in Mock Masq App', async () => {
-    expect.assertions(1)
     await logInWithMasqAppMock(false)
 
     let resolveOnChange
