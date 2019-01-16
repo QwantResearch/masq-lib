@@ -122,7 +122,7 @@ describe('Login procedure', () => {
   })
 
   test('should join a channel', async () => {
-    expect.assertions(1)
+    let peersLength
 
     const waitForPeer = new Promise(async (resolve, reject) => {
       const link = await masq.getLoginLink()
@@ -133,7 +133,7 @@ describe('Login procedure', () => {
       const sw = swarm(hub, { wrtc })
 
       sw.on('peer', (peer, id) => {
-        expect(sw.peers).toHaveLength(1)
+        peersLength = sw.peers.length
         sw.close()
       })
 
@@ -143,6 +143,7 @@ describe('Login procedure', () => {
     })
 
     await Promise.all([waitForPeer, masq.logIntoMasq(false)])
+    expect(peersLength).toBe(1)
   })
 
   test('isLoggedIn and isConnected should return false', async () => {
@@ -407,7 +408,6 @@ describe('Login procedure', () => {
       err = e
     }
 
-    expect(err).toBeDefined()
     expect(err.type).toBe(ERRORS.INVALID_KEY)
   })
 
@@ -427,7 +427,6 @@ describe('Login procedure', () => {
       err = e
     }
 
-    expect(err).toBeDefined()
     expect(err.type).toBe(ERRORS.UNABLE_TO_DECRYPT)
   })
 
