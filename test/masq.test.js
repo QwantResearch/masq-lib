@@ -3,7 +3,6 @@ const signalhub = require('signalhubws')
 const swarm = require('webrtc-swarm')
 const wrtc = require('wrtc')
 const common = require('masq-common')
-const ERRORS = common.errors.ERRORS
 window.crypto = require('@trust/webcrypto')
 
 const Masq = require('../src')
@@ -16,6 +15,7 @@ const APP_IMAGE_URL = ' a link to image'
 
 const { dbExists, createPromisifiedHyperDB, resetDbList, getHashParams } = common.utils
 const { genRandomBuffer } = common.crypto
+const ERRORS = common.errors.ERRORS
 
 let server = null
 let masq = null
