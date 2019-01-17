@@ -432,7 +432,7 @@ class Masq {
    */
   watch (key, cb) {
     const db = this._getDB()
-    return db.watch(key, () => cb())
+    return db.watch(key, cb)
   }
 
   /**
