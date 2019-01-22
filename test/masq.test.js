@@ -201,8 +201,6 @@ describe('Login procedure', () => {
   })
 
   test('should not be able to connect with new Masq instance after logging in without stayConnected and disconnecting', async () => {
-    let err
-
     expect(masq.isLoggedIn()).toBe(false)
     await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).toBe(true)
@@ -214,12 +212,11 @@ describe('Login procedure', () => {
     const masq2 = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL)
     expect(masq2.isLoggedIn()).toBe(false)
     expect(masq2.isConnected()).toBe(false)
-    try {
-      await masq2.connectToMasq()
-    } catch (e) {
-      err = e
-    }
-    expect(err.type).toBe(ERRORS.NOT_LOGGED_IN)
+
+    await expect(masq2.connectToMasq())
+      .rejects
+      .toHaveProperty('type', ERRORS.NOT_LOGGED_IN)
+
     expect(masq2.isLoggedIn()).toBe(false)
     expect(masq2.isConnected()).toBe(false)
 
@@ -269,24 +266,16 @@ describe('Login procedure', () => {
   })
 
   test('should fail when connect without prior login', async () => {
-    let err
-
     expect(masq.isLoggedIn()).toBe(false)
+    await expect(masq.connectToMasq())
+      .rejects
+      .toHaveProperty('type', ERRORS.NOT_LOGGED_IN)
 
-    try {
-      await masq.connectToMasq()
-    } catch (e) {
-      err = e
-    }
-
-    expect(err.type).toBe(ERRORS.NOT_LOGGED_IN)
     expect(masq.isLoggedIn()).toBe(false)
     expect(masq.isConnected()).toBe(false)
   })
 
   test('should fail when connect after signout without prior login', async () => {
-    let err
-
     expect(masq.isLoggedIn()).toBe(false)
 
     await logInWithMasqAppMock(false)
@@ -306,13 +295,10 @@ describe('Login procedure', () => {
     expect(masq.isConnected()).toBe(false)
 
     // Trying to reconnect without login should fail
-    try {
-      await masq.connectToMasq()
-    } catch (e) {
-      err = e
-    }
+    await expect(masq.connectToMasq())
+      .rejects
+      .toHaveProperty('type', ERRORS.NOT_LOGGED_IN)
 
-    expect(err.type).toBe(ERRORS.NOT_LOGGED_IN)
     expect(masq.isLoggedIn()).toBe(false)
     expect(masq.isConnected()).toBe(false)
   })
@@ -397,54 +383,44 @@ describe('Login procedure', () => {
     const link = await masq.getLoginLink()
     const hashParams = getHashParams(link)
     const invalidKey = 'wrongChallenge'
-    let err
 
-    try {
-      await Promise.all([
-        mockMasqApp.handleConnectionAuthorized(hashParams.channel, invalidKey),
-        masq.logIntoMasq(false)
-      ])
-    } catch (e) {
-      err = e
-    }
+    const promiseAll = Promise.all([
+      mockMasqApp.handleConnectionAuthorized(hashParams.channel, invalidKey),
+      masq.logIntoMasq(false)
+    ])
 
-    expect(err.type).toBe(ERRORS.INVALID_KEY)
+    await expect(promiseAll)
+      .rejects
+      .toHaveProperty('type', ERRORS.INVALID_KEY)
   })
 
   test('should be kicked if wrong key is used', async () => {
-    let err
+    const link = await masq.getLoginLink()
+    const hashParams = getHashParams(link)
+    // Extracted raw key is only a BUffer of bytes.
+    const extractedWrongKey = Buffer.from(genRandomBuffer(16))
+    const promiseAll = Promise.all([
+      mockMasqApp.handleConnectionAuthorized(hashParams.channel, extractedWrongKey),
+      masq.logIntoMasq(false)
+    ])
 
-    try {
-      const link = await masq.getLoginLink()
-      const hashParams = getHashParams(link)
-      // Extracted raw key is only a BUffer of bytes.
-      const extractedWrongKey = Buffer.from(genRandomBuffer(16))
-      await Promise.all([
-        mockMasqApp.handleConnectionAuthorized(hashParams.channel, extractedWrongKey),
-        masq.logIntoMasq(false)
-      ])
-    } catch (e) {
-      err = e
-    }
-
-    expect(err.type).toBe(ERRORS.UNABLE_TO_DECRYPT)
+    await expect(promiseAll)
+      .rejects
+      .toHaveProperty('type', ERRORS.UNABLE_TO_DECRYPT)
   })
 
   test('should fail when register is refused', async () => {
     const link = await masq.getLoginLink()
     const hashParams = getHashParams(link)
-    let err
 
-    try {
-      await Promise.all([
-        mockMasqApp.handleConnectionRegisterRefused(hashParams.channel, hashParams.key),
-        masq.logIntoMasq(false)
-      ])
-    } catch (e) {
-      err = e
-    }
+    const promiseAll = Promise.all([
+      mockMasqApp.handleConnectionRegisterRefused(hashParams.channel, hashParams.key),
+      masq.logIntoMasq(false)
+    ])
 
-    expect(err.type).toBe(ERRORS.MASQ_ACCESS_REFUSED_BY_USER)
+    await expect(promiseAll)
+      .rejects
+      .toHaveProperty('type', ERRORS.MASQ_ACCESS_REFUSED_BY_USER)
   })
 })
 
@@ -462,14 +438,11 @@ describe('Test data access and input', () => {
     ]
     let err
 
-    promises.forEach(async (p) => {
-      try {
-        await p
-      } catch (e) {
-        err = e
-      }
-      expect(err.type).toBe(ERRORS.NOT_CONNECTED)
-    })
+    for (let p of promises) {
+      await expect(p)
+        .rejects
+        .toHaveProperty('type', ERRORS.NOT_CONNECTED)
+    }
 
     functions.forEach(f => {
       try {
