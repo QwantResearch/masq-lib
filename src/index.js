@@ -76,7 +76,6 @@ class Masq {
 
     const db = common.utils.createPromisifiedHyperDB(this.userId)
     this.userAppDb = db
-    // @@1
     await common.utils.dbReady(db)
     this._startReplication()
   }
@@ -116,30 +115,26 @@ class Masq {
     window.sessionStorage.removeItem('dataEncryptionKey')
   }
 
-  _storeSessionInfo (stayConnected, userId, dataEncryptionKey, username, image) {
+  _storeSessionInfo (stayConnected, userId, dataEncryptionKey, username, profileImage) {
     if (stayConnected) {
       window.localStorage.setItem('userId', userId)
       window.localStorage.setItem('dataEncryptionKey', dataEncryptionKey)
       window.localStorage.setItem('username', username)
-      window.localStorage.setItem('image', image)
+      window.localStorage.setItem('profileImage', profileImage)
     }
     window.sessionStorage.setItem('userId', userId)
     window.sessionStorage.setItem('dataEncryptionKey', dataEncryptionKey)
     window.sessionStorage.setItem('username', username)
-    window.sessionStorage.setItem('image', image)
+    window.sessionStorage.setItem('profileImage', profileImage)
   }
 
   async _loadSessionInfo () {
     // If userId is in sesssion storage, use it and do not touch localStorage
     const sessionUserId = window.sessionStorage.getItem('userId')
     const sessionDataEncryptionKey = window.sessionStorage.getItem('dataEncryptionKey')
-    const sessionUsername = window.sessionStorage.getItem('username')
-    const sessionImage = window.sessionStorage.getItem('image')
 
     if (sessionUserId) {
       this.userId = sessionUserId
-      this.username = sessionUsername
-      this.image = sessionImage
       this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(sessionDataEncryptionKey, 'hex'))
       return
     }
@@ -153,10 +148,10 @@ class Masq {
       const localStorageDataEncryptionKey = window.localStorage.getItem('dataEncryptionKey')
       this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(localStorageDataEncryptionKey, 'hex'))
       window.sessionStorage.setItem('dataEncryptionKey', localStorageDataEncryptionKey)
-      this.username = window.localStorage.getItem('username')
-      window.sessionStorage.setItem('username', this.username)
-      this.image = window.localStorage.getItem('image')
-      window.sessionStorage.setItem('image', this.image)
+      const username = window.localStorage.getItem('username')
+      window.sessionStorage.setItem('username', username)
+      const profileImage = window.localStorage.getItem('profileImage')
+      window.sessionStorage.setItem('profileImage', profileImage)
     }
   }
 
@@ -327,7 +322,7 @@ class Masq {
     let db
     let dataEncryptionKey
     let username
-    let image
+    let profileImage
 
     const handleData = async (sw, peer, data) => {
       const handleError = (err) => {
@@ -351,7 +346,7 @@ class Masq {
           userId = json.userAppDbId
           dataEncryptionKey = json.userAppDEK
           username = json.username
-          image = json.image
+          profileImage = json.image
 
           // Check if the User-app is already registered
           if (await this._isRegistered(userId)) {
@@ -360,7 +355,7 @@ class Masq {
             this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
 
             // Store the session info
-            this._storeSessionInfo(stayConnected, userId, dataEncryptionKey, username, image)
+            this._storeSessionInfo(stayConnected, userId, dataEncryptionKey, username, profileImage)
 
             await this.connectToMasq()
             // logged into Masq
@@ -385,7 +380,7 @@ class Masq {
           userId = json.userAppDbId
           dataEncryptionKey = json.userAppDEK
           username = json.username
-          image = json.image
+          profileImage = json.image
 
           const buffKey = Buffer.from(json.key, 'hex')
           db = common.utils.createPromisifiedHyperDB(userId, buffKey)
@@ -404,7 +399,7 @@ class Masq {
           waitingForWriteAccess = false
 
           // Store the session info
-          this._storeSessionInfo(stayConnected, userId, dataEncryptionKey, username, image)
+          this._storeSessionInfo(stayConnected, userId, dataEncryptionKey, username, profileImage)
           this.userId = userId
           this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
 
