@@ -358,8 +358,7 @@ class Masq {
             this.userId = userId
             // store the dataEncryptionKey as a CryptoKey
             this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
-            this.image = image
-            this.username = username
+
             // Store the session info
             this._storeSessionInfo(stayConnected, userId, dataEncryptionKey, username, image)
 
@@ -408,8 +407,6 @@ class Masq {
           this._storeSessionInfo(stayConnected, userId, dataEncryptionKey, username, image)
           this.userId = userId
           this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
-          this.image = image
-          this.username = username
 
           this.userAppDb = db
           this._startReplication()
