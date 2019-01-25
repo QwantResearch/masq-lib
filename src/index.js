@@ -235,7 +235,7 @@ class Masq {
         if (!json.username) {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'Username not found in \'authorized\' message')
         }
-        if (!json.image) {
+        if (!json.profileImage) {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'Image not found in \'authorized\' message')
         }
         break
@@ -261,7 +261,7 @@ class Masq {
         if (!json.username) {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'Username not found in \'authorized\' message')
         }
-        if (!json.image) {
+        if (!json.profileImage) {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'Image not found in \'authorized\' message')
         }
         break
@@ -346,7 +346,7 @@ class Masq {
           userId = json.userAppDbId
           dataEncryptionKey = json.userAppDEK
           username = json.username
-          profileImage = json.image
+          profileImage = json.profileImage
 
           // Check if the User-app is already registered
           if (await this._isRegistered(userId)) {
@@ -380,7 +380,7 @@ class Masq {
           userId = json.userAppDbId
           dataEncryptionKey = json.userAppDEK
           username = json.username
-          profileImage = json.image
+          profileImage = json.profileImage
 
           const buffKey = Buffer.from(json.key, 'hex')
           db = common.utils.createPromisifiedHyperDB(userId, buffKey)

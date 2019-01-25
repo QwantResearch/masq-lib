@@ -109,7 +109,7 @@ class MockMasqApp {
               msg: 'authorized',
               userAppDbId: userAppId,
               userAppDEK: this.userAppDEK,
-              image: this.profileImage,
+              profileImage: this.profileImage,
               username: this.username
             }
             const encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
@@ -141,7 +141,7 @@ class MockMasqApp {
                     userAppDbId: userAppId,
                     userAppDEK: this.userAppDEK,
                     key: this.dbs[userAppId].key.toString('hex'),
-                    image: this.profileImage,
+                    profileImage: this.profileImage,
                     username: this.username
                   }
                   const encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
