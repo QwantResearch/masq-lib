@@ -116,22 +116,30 @@ class Masq {
     window.sessionStorage.removeItem('dataEncryptionKey')
   }
 
-  _storeSessionInfo (stayConnected, userId, dataEncryptionKey) {
+  _storeSessionInfo (stayConnected, userId, dataEncryptionKey, username, image) {
     if (stayConnected) {
       window.localStorage.setItem('userId', userId)
       window.localStorage.setItem('dataEncryptionKey', dataEncryptionKey)
+      window.localStorage.setItem('username', username)
+      window.localStorage.setItem('image', image)
     }
     window.sessionStorage.setItem('userId', userId)
     window.sessionStorage.setItem('dataEncryptionKey', dataEncryptionKey)
+    window.sessionStorage.setItem('username', username)
+    window.sessionStorage.setItem('image', image)
   }
 
   async _loadSessionInfo () {
     // If userId is in sesssion storage, use it and do not touch localStorage
     const sessionUserId = window.sessionStorage.getItem('userId')
     const sessionDataEncryptionKey = window.sessionStorage.getItem('dataEncryptionKey')
+    const sessionUsername = window.sessionStorage.getItem('username')
+    const sessionImage = window.sessionStorage.getItem('image')
 
     if (sessionUserId) {
       this.userId = sessionUserId
+      this.username = sessionUsername
+      this.image = sessionImage
       this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(sessionDataEncryptionKey, 'hex'))
       return
     }
@@ -145,6 +153,10 @@ class Masq {
       const localStorageDataEncryptionKey = window.localStorage.getItem('dataEncryptionKey')
       this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(localStorageDataEncryptionKey, 'hex'))
       window.sessionStorage.setItem('dataEncryptionKey', localStorageDataEncryptionKey)
+      this.username = window.localStorage.getItem('username')
+      window.sessionStorage.setItem('username', this.username)
+      this.image = window.localStorage.getItem('image')
+      window.sessionStorage.setItem('image', this.image)
     }
   }
 
@@ -225,6 +237,12 @@ class Masq {
         if (!json.userAppDEK) {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'User app dataEncryptionKey (userAppDEK) not found in \'authorized\' message')
         }
+        if (!json.username) {
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'Username not found in \'authorized\' message')
+        }
+        if (!json.image) {
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'Image not found in \'authorized\' message')
+        }
         break
 
       case 'notAuthorized':
@@ -244,6 +262,12 @@ class Masq {
         }
         if (!json.userAppDEK) {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'User app dataEncryptionKey (userAppDEK) not found in "masqAccessGranted" message')
+        }
+        if (!json.username) {
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'Username not found in \'authorized\' message')
+        }
+        if (!json.image) {
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'Image not found in \'authorized\' message')
         }
         break
 
@@ -302,6 +326,8 @@ class Masq {
     let userId
     let db
     let dataEncryptionKey
+    let username
+    let image
 
     const handleData = async (sw, peer, data) => {
       const handleError = (err) => {
@@ -321,16 +347,21 @@ class Masq {
 
       switch (json.msg) {
         case 'authorized':
+
           userId = json.userAppDbId
           dataEncryptionKey = json.userAppDEK
+          username = json.username
+          image = json.image
 
           // Check if the User-app is already registered
           if (await this._isRegistered(userId)) {
             this.userId = userId
             // store the dataEncryptionKey as a CryptoKey
             this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
+            this.image = image
+            this.username = username
             // Store the session info
-            this._storeSessionInfo(stayConnected, userId, dataEncryptionKey)
+            this._storeSessionInfo(stayConnected, userId, dataEncryptionKey, username, image)
 
             await this.connectToMasq()
             // logged into Masq
@@ -354,6 +385,8 @@ class Masq {
 
           userId = json.userAppDbId
           dataEncryptionKey = json.userAppDEK
+          username = json.username
+          image = json.image
 
           const buffKey = Buffer.from(json.key, 'hex')
           db = common.utils.createPromisifiedHyperDB(userId, buffKey)
@@ -372,9 +405,11 @@ class Masq {
           waitingForWriteAccess = false
 
           // Store the session info
-          this._storeSessionInfo(stayConnected, userId, dataEncryptionKey)
+          this._storeSessionInfo(stayConnected, userId, dataEncryptionKey, username, image)
           this.userId = userId
           this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
+          this.image = image
+          this.username = username
 
           this.userAppDb = db
           this._startReplication()
