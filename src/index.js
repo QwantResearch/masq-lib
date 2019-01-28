@@ -230,7 +230,7 @@ class Masq {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'Username not found in \'authorized\' message')
         }
         if (!json.profileImage) {
-          throw new MasqError(ERRORS.WRONG_MESSAGE, 'Image not found in \'authorized\' message')
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'profileImage not found in \'authorized\' message')
         }
         break
 
@@ -256,7 +256,7 @@ class Masq {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'Username not found in \'masqAccessGranted\' message')
         }
         if (!json.profileImage) {
-          throw new MasqError(ERRORS.WRONG_MESSAGE, 'Image not found in \'masqAccessGranted\' message')
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'profileImage not found in \'masqAccessGranted\' message')
         }
         break
 
