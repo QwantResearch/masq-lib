@@ -150,6 +150,18 @@ class Masq {
     }
   }
 
+  async getUsername () {
+    const currentUserInfo = window.sessionStorage.getItem(CURRENT_USER_INFO_STR)
+    if (!currentUserInfo) return null
+    return JSON.parse(currentUserInfo).username
+  }
+
+  async getProfileImage () {
+    const currentUserInfo = window.sessionStorage.getItem(CURRENT_USER_INFO_STR)
+    if (!currentUserInfo) return null
+    return JSON.parse(currentUserInfo).profileImage
+  }
+
   async _initSwarmWithDataHandler (channel, dataHandler) {
     return new Promise((resolve, reject) => {
       // Subscribe to channel for a limited time to sync with masq
