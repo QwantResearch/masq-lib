@@ -108,50 +108,44 @@ class Masq {
 
   _deleteSessionInfo (deleteLocal) {
     if (deleteLocal) {
-      window.localStorage.removeItem('userId')
-      window.localStorage.removeItem('dataEncryptionKey')
+      window.localStorage.removeItem('currentUserInfo')
     }
-    window.sessionStorage.removeItem('userId')
-    window.sessionStorage.removeItem('dataEncryptionKey')
+    window.sessionStorage.removeItem('currentUserInfo')
   }
 
   _storeSessionInfo (stayConnected, userId, dataEncryptionKey, username, profileImage) {
-    if (stayConnected) {
-      window.localStorage.setItem('userId', userId)
-      window.localStorage.setItem('dataEncryptionKey', dataEncryptionKey)
-      window.localStorage.setItem('username', username)
-      window.localStorage.setItem('profileImage', profileImage)
+    const currenUserInfo = {
+      userId,
+      dataEncryptionKey,
+      username,
+      profileImage
+
     }
-    window.sessionStorage.setItem('userId', userId)
-    window.sessionStorage.setItem('dataEncryptionKey', dataEncryptionKey)
-    window.sessionStorage.setItem('username', username)
-    window.sessionStorage.setItem('profileImage', profileImage)
+    if (stayConnected) {
+      window.localStorage.setItem('currentUserInfo', JSON.stringify(currenUserInfo))
+    }
+    window.sessionStorage.setItem('currentUserInfo', JSON.stringify(currenUserInfo))
   }
 
   async _loadSessionInfo () {
     // If userId is in sesssion storage, use it and do not touch localStorage
-    const sessionUserId = window.sessionStorage.getItem('userId')
-    const sessionDataEncryptionKey = window.sessionStorage.getItem('dataEncryptionKey')
+    const currentUserInfo = window.sessionStorage.getItem('currentUserInfo')
 
-    if (sessionUserId) {
-      this.userId = sessionUserId
-      this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(sessionDataEncryptionKey, 'hex'))
+    if (currentUserInfo) {
+      const { userId, dataEncryptionKey } = JSON.parse(currentUserInfo)
+      this.userId = userId
+      this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
       return
     }
 
     // if userId is is not in session storage, look for it in local storage
     // and save in session storage
-    const localStorageUserId = window.localStorage.getItem('userId')
-    if (localStorageUserId) {
-      this.userId = localStorageUserId
-      window.sessionStorage.setItem('userId', this.userId)
-      const localStorageDataEncryptionKey = window.localStorage.getItem('dataEncryptionKey')
-      this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(localStorageDataEncryptionKey, 'hex'))
-      window.sessionStorage.setItem('dataEncryptionKey', localStorageDataEncryptionKey)
-      const username = window.localStorage.getItem('username')
-      window.sessionStorage.setItem('username', username)
-      const profileImage = window.localStorage.getItem('profileImage')
-      window.sessionStorage.setItem('profileImage', profileImage)
+    const localStorageCurrentUserInfo = window.localStorage.getItem('currentUserInfo')
+    if (localStorageCurrentUserInfo) {
+      const { userId, dataEncryptionKey } = JSON.parse(localStorageCurrentUserInfo)
+      this.userId = userId
+      this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
+      window.sessionStorage.setItem('currentUserInfo', localStorageCurrentUserInfo)
     }
   }
 
@@ -259,10 +253,10 @@ class Masq {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'User app dataEncryptionKey (userAppDEK) not found in "masqAccessGranted" message')
         }
         if (!json.username) {
-          throw new MasqError(ERRORS.WRONG_MESSAGE, 'Username not found in \'authorized\' message')
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'Username not found in \'masqAccessGranted\' message')
         }
         if (!json.profileImage) {
-          throw new MasqError(ERRORS.WRONG_MESSAGE, 'Image not found in \'authorized\' message')
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'Image not found in \'masqAccessGranted\' message')
         }
         break
 
