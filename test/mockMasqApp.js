@@ -16,6 +16,8 @@ class MockMasqApp {
     this.dbsRepSW = {}
     this.userAppDEK = '00112233445566778899AABBCCDDEEFF'
     this.dataEncryptionKey = null
+    this.profileImage = 'image'
+    this.username = 'bob'
   }
 
   async init () {
@@ -106,7 +108,9 @@ class MockMasqApp {
             const msg = {
               msg: 'authorized',
               userAppDbId: userAppId,
-              userAppDEK: this.userAppDEK
+              userAppDEK: this.userAppDEK,
+              profileImage: this.profileImage,
+              username: this.username
             }
             const encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
             peer.send(JSON.stringify(encryptedMsg))
@@ -136,7 +140,9 @@ class MockMasqApp {
                     msg: 'masqAccessGranted',
                     userAppDbId: userAppId,
                     userAppDEK: this.userAppDEK,
-                    key: this.dbs[userAppId].key.toString('hex')
+                    key: this.dbs[userAppId].key.toString('hex'),
+                    profileImage: this.profileImage,
+                    username: this.username
                   }
                   const encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
                   peer.send(JSON.stringify(encryptedMsg))

@@ -6,6 +6,7 @@ const pump = require('pump')
 const common = require('masq-common')
 const ERRORS = common.errors.ERRORS
 const MasqError = common.errors.MasqError
+const CURRENT_USER_INFO_STR = 'currentUserInfo'
 
 const config = require('../config/config')
 
@@ -76,7 +77,6 @@ class Masq {
 
     const db = common.utils.createPromisifiedHyperDB(this.userId)
     this.userAppDb = db
-    // @@1
     await common.utils.dbReady(db)
     this._startReplication()
   }
@@ -109,42 +109,44 @@ class Masq {
 
   _deleteSessionInfo (deleteLocal) {
     if (deleteLocal) {
-      window.localStorage.removeItem('userId')
-      window.localStorage.removeItem('dataEncryptionKey')
+      window.localStorage.removeItem(CURRENT_USER_INFO_STR)
     }
-    window.sessionStorage.removeItem('userId')
-    window.sessionStorage.removeItem('dataEncryptionKey')
+    window.sessionStorage.removeItem(CURRENT_USER_INFO_STR)
   }
 
-  _storeSessionInfo (stayConnected, userId, dataEncryptionKey) {
-    if (stayConnected) {
-      window.localStorage.setItem('userId', userId)
-      window.localStorage.setItem('dataEncryptionKey', dataEncryptionKey)
+  _storeSessionInfo (stayConnected, userId, dataEncryptionKey, username, profileImage) {
+    const currenUserInfo = {
+      userId,
+      dataEncryptionKey,
+      username,
+      profileImage
+
     }
-    window.sessionStorage.setItem('userId', userId)
-    window.sessionStorage.setItem('dataEncryptionKey', dataEncryptionKey)
+    if (stayConnected) {
+      window.localStorage.setItem(CURRENT_USER_INFO_STR, JSON.stringify(currenUserInfo))
+    }
+    window.sessionStorage.setItem(CURRENT_USER_INFO_STR, JSON.stringify(currenUserInfo))
   }
 
   async _loadSessionInfo () {
     // If userId is in sesssion storage, use it and do not touch localStorage
-    const sessionUserId = window.sessionStorage.getItem('userId')
-    const sessionDataEncryptionKey = window.sessionStorage.getItem('dataEncryptionKey')
+    const currentUserInfo = window.sessionStorage.getItem(CURRENT_USER_INFO_STR)
 
-    if (sessionUserId) {
-      this.userId = sessionUserId
-      this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(sessionDataEncryptionKey, 'hex'))
+    if (currentUserInfo) {
+      const { userId, dataEncryptionKey } = JSON.parse(currentUserInfo)
+      this.userId = userId
+      this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
       return
     }
 
     // if userId is is not in session storage, look for it in local storage
     // and save in session storage
-    const localStorageUserId = window.localStorage.getItem('userId')
-    if (localStorageUserId) {
-      this.userId = localStorageUserId
-      window.sessionStorage.setItem('userId', this.userId)
-      const localStorageDataEncryptionKey = window.localStorage.getItem('dataEncryptionKey')
-      this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(localStorageDataEncryptionKey, 'hex'))
-      window.sessionStorage.setItem('dataEncryptionKey', localStorageDataEncryptionKey)
+    const localStorageCurrentUserInfo = window.localStorage.getItem(CURRENT_USER_INFO_STR)
+    if (localStorageCurrentUserInfo) {
+      const { userId, dataEncryptionKey } = JSON.parse(localStorageCurrentUserInfo)
+      this.userId = userId
+      this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
+      window.sessionStorage.setItem(CURRENT_USER_INFO_STR, localStorageCurrentUserInfo)
     }
   }
 
@@ -225,6 +227,12 @@ class Masq {
         if (!json.userAppDEK) {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'User app dataEncryptionKey (userAppDEK) not found in \'authorized\' message')
         }
+        if (!json.username) {
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'Username not found in \'authorized\' message')
+        }
+        if (!json.profileImage) {
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'profileImage not found in \'authorized\' message')
+        }
         break
 
       case 'notAuthorized':
@@ -244,6 +252,12 @@ class Masq {
         }
         if (!json.userAppDEK) {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'User app dataEncryptionKey (userAppDEK) not found in "masqAccessGranted" message')
+        }
+        if (!json.username) {
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'Username not found in \'masqAccessGranted\' message')
+        }
+        if (!(json.hasOwnProperty('profileImage'))) {
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'profileImage not found in \'masqAccessGranted\' message')
         }
         break
 
@@ -302,6 +316,8 @@ class Masq {
     let userId
     let db
     let dataEncryptionKey
+    let username
+    let profileImage
 
     const handleData = async (sw, peer, data) => {
       const handleError = (err) => {
@@ -321,16 +337,20 @@ class Masq {
 
       switch (json.msg) {
         case 'authorized':
+
           userId = json.userAppDbId
           dataEncryptionKey = json.userAppDEK
+          username = json.username
+          profileImage = json.profileImage
 
           // Check if the User-app is already registered
           if (await this._isRegistered(userId)) {
             this.userId = userId
             // store the dataEncryptionKey as a CryptoKey
             this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
+
             // Store the session info
-            this._storeSessionInfo(stayConnected, userId, dataEncryptionKey)
+            this._storeSessionInfo(stayConnected, userId, dataEncryptionKey, username, profileImage)
 
             await this.connectToMasq()
             // logged into Masq
@@ -354,6 +374,8 @@ class Masq {
 
           userId = json.userAppDbId
           dataEncryptionKey = json.userAppDEK
+          username = json.username
+          profileImage = json.profileImage
 
           const buffKey = Buffer.from(json.key, 'hex')
           db = common.utils.createPromisifiedHyperDB(userId, buffKey)
@@ -372,7 +394,7 @@ class Masq {
           waitingForWriteAccess = false
 
           // Store the session info
-          this._storeSessionInfo(stayConnected, userId, dataEncryptionKey)
+          this._storeSessionInfo(stayConnected, userId, dataEncryptionKey, username, profileImage)
           this.userId = userId
           this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
 
