@@ -6,6 +6,7 @@ const pump = require('pump')
 const common = require('masq-common')
 const ERRORS = common.errors.ERRORS
 const MasqError = common.errors.MasqError
+const CURRENT_USER_INFO_STR = 'currentUserInfo'
 
 const config = require('../config/config')
 
@@ -108,9 +109,9 @@ class Masq {
 
   _deleteSessionInfo (deleteLocal) {
     if (deleteLocal) {
-      window.localStorage.removeItem('currentUserInfo')
+      window.localStorage.removeItem(CURRENT_USER_INFO_STR)
     }
-    window.sessionStorage.removeItem('currentUserInfo')
+    window.sessionStorage.removeItem(CURRENT_USER_INFO_STR)
   }
 
   _storeSessionInfo (stayConnected, userId, dataEncryptionKey, username, profileImage) {
@@ -122,14 +123,14 @@ class Masq {
 
     }
     if (stayConnected) {
-      window.localStorage.setItem('currentUserInfo', JSON.stringify(currenUserInfo))
+      window.localStorage.setItem(CURRENT_USER_INFO_STR, JSON.stringify(currenUserInfo))
     }
-    window.sessionStorage.setItem('currentUserInfo', JSON.stringify(currenUserInfo))
+    window.sessionStorage.setItem(CURRENT_USER_INFO_STR, JSON.stringify(currenUserInfo))
   }
 
   async _loadSessionInfo () {
     // If userId is in sesssion storage, use it and do not touch localStorage
-    const currentUserInfo = window.sessionStorage.getItem('currentUserInfo')
+    const currentUserInfo = window.sessionStorage.getItem(CURRENT_USER_INFO_STR)
 
     if (currentUserInfo) {
       const { userId, dataEncryptionKey } = JSON.parse(currentUserInfo)
@@ -140,12 +141,12 @@ class Masq {
 
     // if userId is is not in session storage, look for it in local storage
     // and save in session storage
-    const localStorageCurrentUserInfo = window.localStorage.getItem('currentUserInfo')
+    const localStorageCurrentUserInfo = window.localStorage.getItem(CURRENT_USER_INFO_STR)
     if (localStorageCurrentUserInfo) {
       const { userId, dataEncryptionKey } = JSON.parse(localStorageCurrentUserInfo)
       this.userId = userId
       this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
-      window.sessionStorage.setItem('currentUserInfo', localStorageCurrentUserInfo)
+      window.sessionStorage.setItem(CURRENT_USER_INFO_STR, localStorageCurrentUserInfo)
     }
   }
 
