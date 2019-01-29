@@ -1,7 +1,7 @@
 var path = require('path')
 
 module.exports = {
-  entry: './src/index.js',
+  entry: './babelOut/index.js',
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'masq.js',
