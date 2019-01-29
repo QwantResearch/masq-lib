@@ -5,6 +5,7 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'masq.js',
-    library: 'masq'
+    library: 'masq',
+    libraryTarget: "umd"
   }
 }
