@@ -516,4 +516,4 @@ class Masq {
   }
 }
 
-module.exports = Masq
+export default Masq
