@@ -305,13 +305,39 @@ class Masq {
     return this.loginUrl.href
   }
 
+  async logIntoMasq (stayConnected) {
+    for (let i = 0; i < 3; i++) {
+      try {
+        console.log('step', i)
+        await this.tryToLogIntoMasq(stayConnected)
+        // if no error catched but initial step not passed, try again
+        if (this.initialStepPassed) {
+          return true
+        }
+      } catch (error) {
+        // if not authorized message
+        if (error.type === 'Masq access refused by the user') {
+          console.log('Refused by user')
+          this.initialStepPassed = false
+          return false
+        }
+        // if any errors occurs after passing the first step do not try again
+        if (this.initialStepPassed) {
+          this.initialStepPassed = false
+          console.log('An errors occurs after the first step is passed, do not try again')
+          return false
+        }
+      }
+    }
+  }
+
   /**
    * If this is the first time, this.dbs.profiles is empty.
    * We need to get masq-profiles hyperdb key of masq.
    * @returns {string, string, string}
    *  link - the link to open the masq app with the right
    */
-  async logIntoMasq (stayConnected) {
+  async tryToLogIntoMasq (stayConnected) {
     // logout if loggedin when called
     if (this.userId) {
       this.signout()
