@@ -351,7 +351,7 @@ class Masq {
 
       switch (json.msg) {
         case 'authorized':
-          this.initialStepPassed = false
+          this.initialStepPassed = true
           userId = json.userAppDbId
           dataEncryptionKey = json.userAppDEK
           username = json.username
@@ -379,7 +379,7 @@ class Masq {
 
         case 'notAuthorized':
           // if this User-app is not registered
-          this.initialStepPassed = false
+          this.initialStepPassed = true
           registering = true
           this._requestUserAppRegister(key, peer)
           break
