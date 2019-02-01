@@ -242,7 +242,7 @@ class Masq {
         if (!json.username) {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'Username not found in \'authorized\' message')
         }
-        if (!json.profileImage) {
+        if (!(json.hasOwnProperty('profileImage'))) {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'profileImage not found in \'authorized\' message')
         }
         break
