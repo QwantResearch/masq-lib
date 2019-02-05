@@ -7,5 +7,8 @@ module.exports = {
     filename: 'masq.js',
     library: 'masq',
     libraryTarget: 'umd'
+  },
+  node: {
+    fs: 'empty'
   }
 }
