@@ -2,7 +2,7 @@
   "name": "masq-lib",
   "version": "0.0.0",
   "description": "",
-  "module": "dist/masq.js",
+  "main": "dist/masq.js",
   "scripts": {
     "test": "eslint src/ test/ && jest",
     "build": "webpack -p",
