@@ -10,5 +10,8 @@ module.exports = {
   },
   node: {
     fs: 'empty'
+  },
+  externals: {
+    'masq-common': 'commonjs masq-common'
   }
 }
