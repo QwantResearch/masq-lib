@@ -4,7 +4,7 @@
   "description": "",
   "main": "dist/masq.js",
   "scripts": {
-    "test": "eslint src/ test/ && jest",
+    "test": "eslint . && jest",
     "build": "webpack -p",
     "stats": "webpack --profile --json > stats.json",
     "analyze": "webpack-bundle-analyzer ./stats.json ./dist"
