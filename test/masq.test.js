@@ -28,8 +28,28 @@ jest.mock('random-access-idb', () =>
   () => require('random-access-memory'))
 
 jest.mock('masq-common', () => {
+  const hyperdb = require('hyperdb')
+  const ram = require('random-access-memory')
+  const { promisify } = require('es6-promisify')
   const original = require.requireActual('masq-common')
-  const originalCreate = original.utils.createPromisifiedHyperDB
+
+  // Same function as original, but use ram instead
+  const createPromisifiedHyperDBMock = (name, hexKey) => {
+    const methodsToPromisify = ['version', 'put', 'get', 'del', 'batch', 'list', 'authorize', 'authorized']
+    const keyBuffer = hexKey
+      ? Buffer.from(hexKey, 'hex')
+      : null
+
+    const db = hyperdb(ram, keyBuffer, { valueEncoding: 'json', firstNode: true })
+
+    // Promisify methods with Async suffix
+    methodsToPromisify.forEach(m => {
+      db[`${m}Async`] = promisify(db[m])
+    })
+
+    return db
+  }
+
   return {
     ...original,
     dbList: {},
@@ -38,7 +58,7 @@ jest.mock('masq-common', () => {
       dbExists: (name) => Promise.resolve(!!this.dbList[name]),
       createPromisifiedHyperDB: (name, hexKey) => {
         this.dbList[name] = 'db'
-        return originalCreate(name, hexKey)
+        return createPromisifiedHyperDBMock(name, hexKey)
       },
       resetDbList: () => {
         this.dbList = {}
