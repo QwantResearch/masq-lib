@@ -5,6 +5,7 @@
   "main": "dist/masq.js",
   "module": "src/index.js",
   "scripts": {
+    "install": "npm run build",
     "test": "eslint . && jest",
     "build": "webpack -p",
     "stats": "webpack --profile --json > stats.json",
