@@ -1,6 +1,6 @@
 {
-  "MASQ_APP_BASE_URL": "https://qwantresearch.github.io/masq-app/",
-  "HUB_URLS": [ "wss://signalhub-jvunerwwrg.now.sh" ],
+  "MASQ_APP_BASE_URL": "https://masq.qwant.plive/#/",
+  "HUB_URLS": [ "wss://masq-ws.qwant.plive/" ],
   "SWARM_CONFIG": {
   }
 }
