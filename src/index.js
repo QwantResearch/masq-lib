@@ -20,13 +20,8 @@ const debug = (function () {
 })()
 
 const createSwarm = (hub) => {
-  let wrtc = null
-  if (config.wrtc) {
-    wrtc = config.wrtc
-  }
-
   return swarm(hub, {
-    wrtc,
+    wrtc: !swarm.WEBRTC_SUPPORT ? import(/* webpackMode: "lazy" */ 'wrtc') : null,
     config: config.SWARM_CONFIG
   })
 }
