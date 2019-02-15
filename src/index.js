@@ -330,6 +330,7 @@ class Masq {
     let dataEncryptionKey
     let username
     let profileImage
+    this._logIntoMasqErr = null
 
     const handleData = async (sw, peer, data) => {
       const handleError = (err) => {
