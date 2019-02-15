@@ -31,7 +31,7 @@ class Masq {
    * constructor
    * @param {string} appName - The application name
    */
-  constructor (appName, appDescription, appImageURL) {
+  constructor (appName, appDescription, appImageURL, signalhubUrl, baseMasqAppUrl) {
     this._reset()
 
     this.appName = appName
@@ -48,6 +48,14 @@ class Masq {
     this.loginChannel = null
     this.loginKey = null
     this.loginUrl = null
+
+    if (signalhubUrl) {
+      config.HUB_URLS = [signalhubUrl]
+    }
+
+    if (baseMasqAppUrl) {
+      config.MASQ_APP_BASE_URL = baseMasqAppUrl
+    }
   }
 
   _reset () {
