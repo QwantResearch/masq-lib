@@ -306,7 +306,7 @@ class Masq {
     this.loginUrl = new URL(config.MASQ_APP_BASE_URL)
     const requestType = 'login'
     const hashParams = JSON.stringify([this.appName, requestType, this.loginChannel, keyBase64])
-    this.loginUrl.hash = '/' + Buffer.from(hashParams).toString('base64')
+    this.loginUrl.hash = '/link/' + Buffer.from(hashParams).toString('base64')
 
     return this.loginUrl.href
   }
