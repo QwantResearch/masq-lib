@@ -7,7 +7,7 @@ const common = require('masq-common')
 const ERRORS = common.errors.ERRORS
 const MasqError = common.errors.MasqError
 
-const config = require('../config/config')
+const config = require('../config/config.test.json')
 
 class MockMasqApp {
   constructor () {
