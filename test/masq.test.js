@@ -7,7 +7,11 @@ window.crypto = require('@trust/webcrypto')
 
 const Masq = require('../src')
 const MasqAppMock = require('./mockMasqApp')
-const config = require('../config/config')
+const testConfig = require('../config/config.test.json')
+const testOptions = {
+  hubUrls: testConfig.HUB_URLS,
+  masqAppBaseUrl: testConfig.MASQ_APP_BASE_URL
+}
 
 const APP_NAME = 'app1'
 const APP_DESCRIPTION = 'A wonderful app'
@@ -110,7 +114,7 @@ afterAll((done) => {
 })
 
 beforeEach(async () => {
-  masq = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL)
+  masq = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL, testOptions)
   mockMasqApp = new MasqAppMock()
   await mockMasqApp.init()
 })
@@ -152,7 +156,7 @@ describe('Login procedure', () => {
     const uuidSize = 36
     const link = await masq.getLoginLink()
     const url = new URL(link)
-    const base = config.MASQ_APP_BASE_URL
+    const base = testOptions.masqAppBaseUrl
     expect(url.origin + url.pathname).toBe(base)
     const hashParams = getHashParams(link)
     expect(hashParams.channel).toHaveLength(uuidSize)
@@ -166,7 +170,7 @@ describe('Login procedure', () => {
       const hashParams = getHashParams(link)
 
       // simulating masq app
-      const hub = signalhub(hashParams.channel, config.HUB_URLS)
+      const hub = signalhub(hashParams.channel, testOptions.hubUrls)
       const sw = swarm(hub, { wrtc })
 
       sw.on('peer', (peer, id) => {
@@ -222,7 +226,7 @@ describe('Login procedure', () => {
     expect(masq.isConnected()).toBe(false)
 
     // reconnect with new Masq instance
-    const masq2 = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL)
+    const masq2 = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL, testOptions)
     expect(masq2.isLoggedIn()).toBe(true)
     expect(masq2.isConnected()).toBe(false)
     await masq2.connectToMasq()
@@ -246,7 +250,7 @@ describe('Login procedure', () => {
     expect(masq.isConnected()).toBe(false)
 
     // reconnect with new Masq instance (masq2)
-    const masq2 = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL)
+    const masq2 = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL, testOptions)
     expect(masq2.isLoggedIn()).toBe(false)
     expect(masq2.isConnected()).toBe(false)
 
