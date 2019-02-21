@@ -511,17 +511,33 @@ class Masq {
     return db.delAsync(key)
   }
 
-  /**
-   * List all keys and values
-   * @param {string} prefix - Prefix
-   * @returns {Promise}
-   */
-  async list (prefix) {
+  async _list (prefix) {
     const db = this._getDB()
     this._checkDEK()
 
     const list = await common.utils.list(db, this.dataEncryptionKey, prefix)
     return list
+  }
+
+  /**
+   * List all keys beginning with the given prefix, and their values
+   * @param {string} prefix - Prefix
+   * @returns {Promise}
+   */
+  async listPrefix (prefix) {
+    if (!prefix) {
+      throw new MasqError(ERRORS.WRONG_FUNCTION_ARGUMENTS, 'prefix argument is required')
+    }
+
+    return this._list(prefix)
+  }
+
+  /**
+   * List all keys and values
+   * @returns {Promise}
+   */
+  async list () {
+    return this._list()
   }
 }
 

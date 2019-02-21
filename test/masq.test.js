@@ -471,7 +471,8 @@ describe('Test data access and input', () => {
       masq.get('key'),
       masq.put('key', 'value'),
       masq.del('key'),
-      masq.list('/')
+      masq.listPrefix('/'),
+      masq.list()
     ]
     let err
 
@@ -508,9 +509,9 @@ describe('Test data access and input', () => {
   })
 
   // By default hyperDB list method returns key="" value=null if no put has been done
-  test('list should return {} if empty (with "/" as parameter)', async () => {
+  test('listPrefix should return {} if empty (with "/" as parameter)', async () => {
     await logInWithMasqAppMock(false)
-    const res = await masq.list()
+    const res = await masq.listPrefix('/')
     expect(res).toEqual({})
   })
 
@@ -527,7 +528,7 @@ describe('Test data access and input', () => {
     )
     await Promise.all(promiseArr)
     await masq.del('hello2')
-    const res = await masq.list('/')
+    const res = await masq.list()
 
     const expected = Object.keys(keyValues).reduce((dic, k) => {
       if (k !== 'hello2') dic[k] = keyValues[k]
