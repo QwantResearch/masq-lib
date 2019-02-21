@@ -538,6 +538,35 @@ describe('Test data access and input', () => {
     expect(res).toEqual(expected)
   })
 
+  test('listPrefix should raise an error when prefix argument is not passed', async () => {
+    await logInWithMasqAppMock(false)
+    await expect(masq.listPrefix())
+      .rejects
+      .toHaveProperty('type', ERRORS.WRONG_FUNCTION_ARGUMENTS)
+  })
+
+  test('listPrefix("/prefix1") should get every put items with keys beginning with prefix1', async () => {
+    await logInWithMasqAppMock(false)
+    const keyValues = {
+      'prefix1/hello': { data: 'world' },
+      'prefix2/hello1': { data: 'world1' },
+      'prefix1/hello2': { data: 'world2' },
+      'prefix2/hello3': { data: 'world3' }
+    }
+    const promiseArr = Object.keys(keyValues).map(k =>
+      masq.put(k, keyValues[k])
+    )
+    await Promise.all(promiseArr)
+    const res = await masq.listPrefix('prefix1')
+
+    const expected = Object.keys(keyValues).reduce((dic, k) => {
+      if (k.startsWith('prefix1/')) dic[k] = keyValues[k]
+      return dic
+    }, {})
+
+    expect(res).toEqual(expected)
+  })
+
   test('del should del an item', async () => {
     await logInWithMasqAppMock(false)
     const key = '/hello'
