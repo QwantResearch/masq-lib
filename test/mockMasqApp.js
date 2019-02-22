@@ -32,7 +32,7 @@ class MockMasqApp {
 
   _startReplication (userAppId) {
     const discoveryKey = this.dbs[userAppId].discoveryKey.toString('hex')
-    this.dbsRepHub[userAppId] = signalhub(discoveryKey, config.HUB_URLS)
+    this.dbsRepHub[userAppId] = signalhub(discoveryKey, config.hubUrls)
 
     if (swarm.WEBRTC_SUPPORT) {
       this.dbsRepSW[userAppId] = swarm(this.dbsRepHub[userAppId])
@@ -88,7 +88,7 @@ class MockMasqApp {
   _handleConnection (authorized, registerAccepted) {
     return (channel, rawKey) => {
       return new Promise(async (resolve, reject) => {
-        const hub = signalhub(channel, config.HUB_URLS)
+        const hub = signalhub(channel, config.hubUrls)
         const sw = swarm(hub, { wrtc })
         const userAppId = 'userAppId-' + uuidv4()
 

@@ -1,6 +1,6 @@
 {
-  "MASQ_APP_BASE_URL": "should_be_overridden",
-  "HUB_URLS": "should_be_overridden",
-  "SWARM_CONFIG": {
+  "masqAppBaseUrl": "should_be_overridden",
+  "hubUrls": "should_be_overridden",
+  "swarmConfig": {
   }
 }
