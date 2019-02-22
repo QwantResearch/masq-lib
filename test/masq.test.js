@@ -466,6 +466,7 @@ describe('Login procedure', () => {
 
 describe('Test data access and input', () => {
   test('operations should fail if masq is not connected', async () => {
+    expect.assertions(5)
     const promises = [
       masq.watch('key'),
       masq.get('key'),
