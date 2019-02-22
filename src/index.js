@@ -492,8 +492,7 @@ class Masq {
    */
   async watch (key, cb) {
     const db = this._getDB()
-    const hashedKey = await common.utils.hashKey(key, this.nonce)
-    return db.watch(hashedKey, cb)
+    await common.utils.watch(db, this.nonce, key, cb)
   }
 
   /**
