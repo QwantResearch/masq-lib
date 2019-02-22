@@ -16,6 +16,7 @@ class MockMasqApp {
     this.dbsRepSW = {}
     this.userAppDEK = '00112233445566778899AABBCCDDEEFF'
     this.dataEncryptionKey = null
+    this.nonce = '00112233445566778899AABBCCDDEEFF'
     this.profileImage = 'image'
     this.username = 'bob'
   }
@@ -57,7 +58,8 @@ class MockMasqApp {
   }
 
   async get (userAppId, key) {
-    const node = await this.dbs[userAppId].getAsync(key)
+    const hashedKey = await common.utils.hashKey(key, this.nonce)
+    const node = await this.dbs[userAppId].getAsync(hashedKey)
     if (!node) return null
     const dec = await this._decryptValue(node.value)
     return dec
@@ -66,11 +68,13 @@ class MockMasqApp {
 
   async put (userAppId, key, value) {
     const enc = await this._encryptValue(value)
-    return this.dbs[userAppId].putAsync(key, enc)
+    const hashedKey = await common.utils.hashKey(key, this.nonce)
+    return this.dbs[userAppId].putAsync(hashedKey, enc)
   }
 
-  watch (userAppId, key, cb) {
-    return this.dbs[userAppId].watch(key, () => cb())
+  async watch (userAppId, key, cb) {
+    const hashedKey = await common.utils.hashKey(key, this.nonce)
+    return this.dbs[userAppId].watch(hashedKey, () => cb())
   }
 
   handleConnectionAuthorized (channel, key) {
@@ -109,6 +113,7 @@ class MockMasqApp {
               msg: 'authorized',
               userAppDbId: userAppId,
               userAppDEK: this.userAppDEK,
+              userAppNonce: this.nonce,
               profileImage: this.profileImage,
               username: this.username
             }
@@ -140,6 +145,7 @@ class MockMasqApp {
                     msg: 'masqAccessGranted',
                     userAppDbId: userAppId,
                     userAppDEK: this.userAppDEK,
+                    userAppNonce: this.nonce,
                     key: this.dbs[userAppId].key.toString('hex'),
                     profileImage: this.profileImage,
                     username: this.username
