@@ -8,7 +8,7 @@ const ERRORS = common.errors.ERRORS
 const MasqError = common.errors.MasqError
 const CURRENT_USER_INFO_STR = 'currentUserInfo'
 
-const _config = require('../config/config.prod.json')
+const jsonConfig = require('../config/config.prod.json')
 
 const debug = (function () {
   switch (process.env.NODE_ENV) {
@@ -44,17 +44,16 @@ class Masq {
 
     // override config with constructor options
     this.config = {
-      ..._config,
-      HUB_URLS: options.hubUrls ? options.hubUrls : _config.HUB_URLS,
-      MASQ_APP_BASE_URL: options.masqAppBaseUrl ? options.masqAppBaseUrl : _config.MASQ_APP_BASE_URL,
-      SWARM_CONFIG: options.swarmConfig ? options.swarmConfig : _config.SWARM_CONFIG
+      hubUrls: options.hubUrls ? options.hubUrls : jsonConfig.hubUrls,
+      masqAppBaseUrl: options.masqAppBaseUrl ? options.masqAppBaseUrl : jsonConfig.masqAppBaseUrl,
+      swarmConfig: options.swarmConfig ? options.swarmConfig : jsonConfig.swarmConfig
     }
   }
 
   _createSwarm (hub) {
     return swarm(hub, {
       wrtc: !swarm.WEBRTC_SUPPORT ? require('wrtc') : null,
-      config: this.config.SWARM_CONFIG
+      config: this.config.swarmConfig
     })
   }
 
@@ -174,7 +173,7 @@ class Masq {
     return new Promise((resolve, reject) => {
       // Subscribe to channel for a limited time to sync with masq
       debug(`Creation of a hub with ${channel} channel name`)
-      const hub = signalhub(channel, this.config.HUB_URLS)
+      const hub = signalhub(channel, this.config.hubUrls)
       const sw = this._createSwarm(hub)
 
       sw.on('peer', (peer, id) => {
@@ -194,7 +193,7 @@ class Masq {
 
   _startReplication () {
     const discoveryKey = this.userAppDb.discoveryKey.toString('hex')
-    this.userAppRepHub = signalhub(discoveryKey, this.config.HUB_URLS)
+    this.userAppRepHub = signalhub(discoveryKey, this.config.hubUrls)
     this.userAppRepSW = this._createSwarm(this.userAppRepHub)
 
     this.userAppRepSW.on('peer', async (peer, id) => {
@@ -303,7 +302,7 @@ class Masq {
     this.loginKey = await common.crypto.genAESKey(true, 'AES-GCM', 128)
     const extractedKey = await common.crypto.exportKey(this.loginKey)
     const keyBase64 = Buffer.from(extractedKey).toString('base64')
-    this.loginUrl = new URL(this.config.MASQ_APP_BASE_URL)
+    this.loginUrl = new URL(this.config.masqAppBaseUrl)
     const requestType = 'login'
     const hashParams = JSON.stringify([this.appName, requestType, this.loginChannel, keyBase64])
     this.loginUrl.hash = '/link/' + Buffer.from(hashParams).toString('base64')
