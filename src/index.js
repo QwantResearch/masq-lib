@@ -503,7 +503,7 @@ class Masq {
    */
   async get (key) {
     const db = this._getDB()
-    const dec = await common.utils.get(db, this.dataEncryptionKey, key, this.nonce)
+    const dec = await common.utils.get(db, this.dataEncryptionKey, this.nonce, key)
     return dec
   }
 
@@ -515,7 +515,7 @@ class Masq {
    */
   async put (key, value) {
     const db = this._getDB()
-    return common.utils.put(db, this.dataEncryptionKey, key, value, this.nonce)
+    return common.utils.put(db, this.dataEncryptionKey, this.nonce, key, value)
   }
 
   /**
@@ -525,7 +525,6 @@ class Masq {
    */
   async del (key) {
     const db = this._getDB()
-    this._checkDEK()
     const hashedKey = await common.utils.hashKey(key, this.nonce)
     return db.delAsync(hashedKey)
   }
@@ -537,9 +536,7 @@ class Masq {
    */
   async list (prefix) {
     const db = this._getDB()
-    this._checkDEK()
-
-    const list = await common.utils.list(db, this.dataEncryptionKey, prefix)
+    const list = await common.utils.list(db, this.dataEncryptionKey, this.nonce, prefix)
     return list
   }
 }
