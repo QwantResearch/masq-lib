@@ -579,7 +579,7 @@ describe('Test replication', () => {
     await waitForChange
     const res = await mockMasqApp.get(masq.userId, '/hello')
     // Because we hash the keys, we include the key name inside the value
-    const expected = { 'key': '/hello', 'value': { 'data': 'world' } }
+    const expected = { 'key': 'hello', 'value': { 'data': 'world' } }
     expect(res).toEqual(expected)
   })
 })
