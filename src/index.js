@@ -477,14 +477,6 @@ class Masq {
     return this.userAppDb
   }
 
-  _checkDEK () {
-    if (!this.dataEncryptionKey) throw Error('Data encryption key is not set')
-  }
-
-  _checkNonce () {
-    if (!this.nonce) throw Error('Nonce is not set')
-  }
-
   /**
    * Set a watcher
    * @param {string} key - Key
