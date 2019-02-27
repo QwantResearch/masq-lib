@@ -121,13 +121,13 @@ class Masq {
     window.sessionStorage.removeItem(CURRENT_USER_INFO_STR)
   }
 
-  _storeSessionInfo (stayConnected, userId, dataEncryptionKey, username, profileImage) {
+  _storeSessionInfo (stayConnected, userId, dataEncryptionKey, username, profileImage, nonce) {
     const currenUserInfo = {
       userId,
       dataEncryptionKey,
       username,
-      profileImage
-
+      profileImage,
+      nonce
     }
     if (stayConnected) {
       window.localStorage.setItem(CURRENT_USER_INFO_STR, JSON.stringify(currenUserInfo))
@@ -140,9 +140,10 @@ class Masq {
     const currentUserInfo = window.sessionStorage.getItem(CURRENT_USER_INFO_STR)
 
     if (currentUserInfo) {
-      const { userId, dataEncryptionKey } = JSON.parse(currentUserInfo)
+      const { userId, dataEncryptionKey, nonce } = JSON.parse(currentUserInfo)
       this.userId = userId
       this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
+      this.nonce = nonce
       return
     }
 
@@ -150,9 +151,10 @@ class Masq {
     // and save in session storage
     const localStorageCurrentUserInfo = window.localStorage.getItem(CURRENT_USER_INFO_STR)
     if (localStorageCurrentUserInfo) {
-      const { userId, dataEncryptionKey } = JSON.parse(localStorageCurrentUserInfo)
+      const { userId, dataEncryptionKey, nonce } = JSON.parse(localStorageCurrentUserInfo)
       this.userId = userId
       this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
+      this.nonce = nonce
       window.sessionStorage.setItem(CURRENT_USER_INFO_STR, localStorageCurrentUserInfo)
     }
   }
@@ -246,6 +248,9 @@ class Masq {
         if (!json.userAppDEK) {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'User app dataEncryptionKey (userAppDEK) not found in \'authorized\' message')
         }
+        if (!json.userAppNonce) {
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'User app nonce (userAppNonce) not found in \'authorized\' message')
+        }
         if (!json.username) {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'Username not found in \'authorized\' message')
         }
@@ -271,6 +276,9 @@ class Masq {
         }
         if (!json.userAppDEK) {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'User app dataEncryptionKey (userAppDEK) not found in "masqAccessGranted" message')
+        }
+        if (!json.userAppNonce) {
+          throw new MasqError(ERRORS.WRONG_MESSAGE, 'User app nonce (userAppNonce) not found in "masqAccessGranted" message')
         }
         if (!json.username) {
           throw new MasqError(ERRORS.WRONG_MESSAGE, 'Username not found in \'masqAccessGranted\' message')
@@ -337,6 +345,7 @@ class Masq {
     let dataEncryptionKey
     let username
     let profileImage
+    let nonce
     this._logIntoMasqErr = null
 
     const handleData = async (sw, peer, data) => {
@@ -360,6 +369,7 @@ class Masq {
 
           userId = json.userAppDbId
           dataEncryptionKey = json.userAppDEK
+          nonce = json.userAppNonce
           username = json.username
           profileImage = json.profileImage
 
@@ -369,8 +379,10 @@ class Masq {
             // store the dataEncryptionKey as a CryptoKey
             this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
 
+            this.nonce = nonce
+
             // Store the session info
-            this._storeSessionInfo(stayConnected, userId, dataEncryptionKey, username, profileImage)
+            this._storeSessionInfo(stayConnected, userId, dataEncryptionKey, username, profileImage, nonce)
 
             await this.connectToMasq()
             // logged into Masq
@@ -395,6 +407,7 @@ class Masq {
           userId = json.userAppDbId
           dataEncryptionKey = json.userAppDEK
           username = json.username
+          nonce = json.userAppNonce
           profileImage = json.profileImage
 
           const buffKey = Buffer.from(json.key, 'hex')
@@ -414,8 +427,9 @@ class Masq {
           waitingForWriteAccess = false
 
           // Store the session info
-          this._storeSessionInfo(stayConnected, userId, dataEncryptionKey, username, profileImage)
+          this._storeSessionInfo(stayConnected, userId, dataEncryptionKey, username, profileImage, nonce)
           this.userId = userId
+          this.nonce = nonce
           this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
 
           this.userAppDb = db
@@ -463,18 +477,14 @@ class Masq {
     return this.userAppDb
   }
 
-  _checkDEK () {
-    if (!this.dataEncryptionKey) throw Error('Data encryption key is not set')
-  }
-
   /**
    * Set a watcher
    * @param {string} key - Key
    * @returns {Object}
    */
-  watch (key, cb) {
+  async watch (key, cb) {
     const db = this._getDB()
-    return db.watch(key, cb)
+    await common.utils.watch(db, this.nonce, key, cb)
   }
 
   /**
@@ -484,7 +494,7 @@ class Masq {
    */
   async get (key) {
     const db = this._getDB()
-    const dec = await common.utils.get(db, this.dataEncryptionKey, key)
+    const dec = await common.utils.get(db, this.dataEncryptionKey, this.nonce, key)
     return dec
   }
 
@@ -496,7 +506,7 @@ class Masq {
    */
   async put (key, value) {
     const db = this._getDB()
-    return common.utils.put(db, this.dataEncryptionKey, key, value)
+    return common.utils.put(db, this.dataEncryptionKey, this.nonce, key, value)
   }
 
   /**
@@ -506,8 +516,8 @@ class Masq {
    */
   async del (key) {
     const db = this._getDB()
-    this._checkDEK()
-    return db.delAsync(key)
+    const hashedKey = await common.utils.hashKey(key, this.nonce)
+    return db.delAsync(hashedKey)
   }
 
   /**
@@ -517,9 +527,7 @@ class Masq {
    */
   async list (prefix) {
     const db = this._getDB()
-    this._checkDEK()
-
-    const list = await common.utils.list(db, this.dataEncryptionKey, prefix)
+    const list = await common.utils.list(db, this.dataEncryptionKey, this.nonce, prefix)
     return list
   }
 }

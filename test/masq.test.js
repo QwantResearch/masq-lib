@@ -466,37 +466,30 @@ describe('Login procedure', () => {
 
 describe('Test data access and input', () => {
   test('operations should fail if masq is not connected', async () => {
-    const functions = [ 'watch' ]
+    expect.assertions(5)
     const promises = [
+      masq.watch('key'),
       masq.get('key'),
       masq.put('key', 'value'),
       masq.del('key'),
       masq.list('/')
     ]
-    let err
 
     for (let p of promises) {
       await expect(p)
         .rejects
         .toHaveProperty('type', ERRORS.NOT_CONNECTED)
     }
-
-    functions.forEach(f => {
-      try {
-        masq[f]()
-      } catch (e) {
-        err = e
-      }
-      expect(err.type).toBe(ERRORS.NOT_CONNECTED)
-    })
   })
 
   test('put/get should put and get an item', async () => {
     await logInWithMasqAppMock(false)
     const key = '/hello'
     const value = { data: 'world' }
+
     await masq.put(key, value)
     const res = await masq.get('/hello')
+
     expect(res).toEqual(value)
   })
 
@@ -564,6 +557,7 @@ describe('Test data access and input', () => {
     const waitForChange = new Promise((resolve) => { resolveOnChange = resolve })
 
     await logInWithMasqAppMock(false)
+
     const key = '/hello'
     const value = { data: 'world' }
     masq.watch('/hello', resolveOnChange)
@@ -585,6 +579,8 @@ describe('Test replication', () => {
     await masq.put(key, value)
     await waitForChange
     const res = await mockMasqApp.get(masq.userId, '/hello')
-    expect(res).toEqual(value)
+    // Because we hash the keys, we include the key name inside the value
+    const expected = { 'key': 'hello', 'value': { 'data': 'world' } }
+    expect(res).toEqual(expected)
   })
 })
