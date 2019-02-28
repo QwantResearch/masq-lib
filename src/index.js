@@ -58,8 +58,11 @@ class Masq {
     window.addEventListener('storage', async (e) => {
       if (e.key === CURRENT_USER_INFO_STR) {
         if (e.newValue === null) {
-          this.eventTarget.dispatchEvent(new Event('signed_out'))
+          if (this.isLoggedIn()) {
+            await this.signout()
+          }
         } else if (e.newValue) {
+          await this.connectToMasq()
           this.eventTarget.dispatchEvent(new Event('logged_in'))
         }
       }
@@ -92,6 +95,8 @@ class Masq {
   }
 
   async connectToMasq () {
+    await this._loadSessionInfo()
+
     if (!this.isLoggedIn()) {
       await this._disconnect()
       throw new MasqError(ERRORS.NOT_LOGGED_IN)
