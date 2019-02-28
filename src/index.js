@@ -27,6 +27,8 @@ class Masq {
   constructor (appName, appDescription, appImageURL, options = {}) {
     this._reset()
 
+    this.eventTarget = new EventTarget()
+
     this.appName = appName
     this.appDescription = appDescription
     this.appImageURL = appImageURL
@@ -48,6 +50,20 @@ class Masq {
       masqAppBaseUrl: options.masqAppBaseUrl ? options.masqAppBaseUrl : jsonConfig.masqAppBaseUrl,
       swarmConfig: options.swarmConfig ? options.swarmConfig : jsonConfig.swarmConfig
     }
+
+    this._listenForLoginOrSignout()
+  }
+
+  _listenForLoginOrSignout () {
+    window.addEventListener('storage', async (e) => {
+      if (e.key === CURRENT_USER_INFO_STR) {
+        if (e.newValue === null) {
+          this.eventTarget.dispatchEvent(new Event('signed_out'))
+        } else if (e.newValue) {
+          this.eventTarget.dispatchEvent(new Event('logged_in'))
+        }
+      }
+    })
   }
 
   _createSwarm (hub) {
@@ -111,6 +127,7 @@ class Masq {
 
     await this._disconnect()
     this._deleteSessionInfo(true)
+    this.eventTarget.dispatchEvent(new Event('signed_out'))
   }
 
   _deleteSessionInfo (deleteLocal) {
@@ -452,6 +469,7 @@ class Masq {
         if (this._logIntoMasqErr) {
           return reject(this._logIntoMasqErr)
         } else {
+          this.eventTarget.dispatchEvent(new Event('logged_in'))
           return resolve()
         }
       }
@@ -461,6 +479,7 @@ class Masq {
         if (this._logIntoMasqErr) {
           return reject(this._logIntoMasqErr)
         } else {
+          this.eventTarget.dispatchEvent(new Event('logged_in'))
           return resolve()
         }
       }
