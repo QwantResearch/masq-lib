@@ -52,6 +52,7 @@ class Masq {
     }
 
     this._listenForLoginOrSignout()
+    this._listenForFocus()
   }
 
   _listenForLoginOrSignout () {
@@ -66,6 +67,12 @@ class Masq {
           this.eventTarget.dispatchEvent(new Event('logged_in'))
         }
       }
+    })
+  }
+
+  _listenForFocus () {
+    document.addEventListener('focus', () => {
+      this.connectToMasq()
     })
   }
 
