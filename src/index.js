@@ -52,7 +52,6 @@ class Masq {
 
   _createSwarm (hub) {
     return swarm(hub, {
-      wrtc: !swarm.WEBRTC_SUPPORT ? require('wrtc') : null,
       config: this.config.swarmConfig
     })
   }
