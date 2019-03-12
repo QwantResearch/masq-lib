@@ -1,13 +1,32 @@
 const signalhub = require('signalhubws')
 const swarm = require('webrtc-swarm')
-const wrtc = require('wrtc')
 const uuidv4 = require('uuid/v4')
 const pump = require('pump')
 const common = require('masq-common')
+const { promisify } = require('es6-promisify')
+const hyperdb = require('hyperdb')
+const ram = require('random-access-memory')
+
+const config = require('../config/config.test.json')
+
 const ERRORS = common.errors.ERRORS
 const MasqError = common.errors.MasqError
 
-const config = require('../config/config.test.json')
+const createPromisifiedHyperDBMock = (name, hexKey) => {
+  const methodsToPromisify = ['version', 'put', 'get', 'del', 'batch', 'list', 'authorize', 'authorized']
+  const keyBuffer = hexKey
+    ? Buffer.from(hexKey, 'hex')
+    : null
+
+  const db = hyperdb(ram, keyBuffer, { valueEncoding: 'json', firstNode: true })
+
+  // Promisify methods with Async suffix
+  methodsToPromisify.forEach(m => {
+    db[`${m}Async`] = promisify(db[m])
+  })
+
+  return db
+}
 
 class MockMasqApp {
   constructor () {
@@ -35,11 +54,7 @@ class MockMasqApp {
     const discoveryKey = this.dbs[userAppId].discoveryKey.toString('hex')
     this.dbsRepHub[userAppId] = signalhub(discoveryKey, config.hubUrls)
 
-    if (swarm.WEBRTC_SUPPORT) {
-      this.dbsRepSW[userAppId] = swarm(this.dbsRepHub[userAppId])
-    } else {
-      this.dbsRepSW[userAppId] = swarm(this.dbsRepHub[userAppId], { wrtc: require('wrtc') })
-    }
+    this.dbsRepSW[userAppId] = swarm(this.dbsRepHub[userAppId])
 
     this.dbsRepSW[userAppId].on('peer', async (peer, id) => {
       const stream = this.dbs[userAppId].replicate({ live: true })
@@ -93,7 +108,7 @@ class MockMasqApp {
     return (channel, rawKey) => {
       return new Promise(async (resolve, reject) => {
         const hub = signalhub(channel, config.hubUrls)
-        const sw = swarm(hub, { wrtc })
+        const sw = swarm(hub)
         const userAppId = 'userAppId-' + uuidv4()
 
         let key
@@ -138,7 +153,7 @@ class MockMasqApp {
                   reject(new MasqError(ERRORS.WRONG_MESSAGE, 'Already registered but received message with type "registered"'))
                 }
                 if (registerAccepted) {
-                  this.dbs[userAppId] = common.utils.createPromisifiedHyperDB(userAppId)
+                  this.dbs[userAppId] = createPromisifiedHyperDBMock(userAppId)
                   await common.utils.dbReady(this.dbs[userAppId])
                   this._startReplication(userAppId)
                   const msg = {

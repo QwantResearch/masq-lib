@@ -1,4 +1,13 @@
 module.exports = {
-  extends: ['standard', 'plugin:jest/recommended'],
-  plugins: ['jest']
+  extends: ['standard'],
+  plugins: ['mocha'],
+  env: {
+    'mocha': true
+  },
+  overrides: [{
+    files: '*.test.js',
+    rules: {
+      'no-unused-expressions': 'off'
+    }
+  }]
 }
