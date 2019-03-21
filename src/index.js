@@ -106,7 +106,7 @@ class Masq {
 
     if (!this.isLoggedIn()) {
       await this._disconnect()
-      throw new MasqError(ERRORS.NOT_LOGGED_IN)
+      return
     }
 
     const db = common.utils.createPromisifiedHyperDB(this.userId)
