@@ -166,7 +166,6 @@ describe('Login procedure', function () {
   })
 
   it('should not be able to connect with new Masq instance after logging in without stayConnected and disconnecting', async () => {
-    let err
     expect(masq.isLoggedIn()).to.be.false
     await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).to.be.true
@@ -179,13 +178,9 @@ describe('Login procedure', function () {
     expect(masq2.isLoggedIn()).to.be.false
     expect(masq2.isConnected()).to.be.false
 
-    try {
-      await masq2.connectToMasq()
-    } catch (e) {
-      err = e
-    }
-    expect(err.type).to.equal(ERRORS.NOT_LOGGED_IN)
+    await masq2.connectToMasq()
 
+    // we should not be logged in or connected even after connectToMasq
     expect(masq2.isLoggedIn()).to.be.false
     expect(masq2.isConnected()).to.be.false
 
@@ -235,21 +230,15 @@ describe('Login procedure', function () {
   })
 
   it('should fail when connect without prior login', async () => {
-    let err
     expect(masq.isLoggedIn()).to.be.false
-    try {
-      await masq.connectToMasq()
-    } catch (e) {
-      err = e
-    }
-    expect(err.type).to.equal(ERRORS.NOT_LOGGED_IN)
+    await masq.connectToMasq()
 
+    // we should not be logged in or connected even after connectToMasq
     expect(masq.isLoggedIn()).to.be.false
     expect(masq.isConnected()).to.be.false
   })
 
   it('should fail when connect after signout without prior login', async () => {
-    let err
     expect(masq.isLoggedIn()).to.be.false
 
     await logInWithMasqAppMock(false)
@@ -268,14 +257,10 @@ describe('Login procedure', function () {
     expect(masq.isLoggedIn()).to.be.false
     expect(masq.isConnected()).to.be.false
 
-    // Trying to reconnect without login should fail
-    try {
-      await masq.connectToMasq()
-    } catch (e) {
-      err = e
-    }
+    // Trying to reconnect without login should have no effect
+    await masq.connectToMasq()
 
-    expect(err.type).to.equal(ERRORS.NOT_LOGGED_IN)
+    // we should not be logged in or connected even after connectToMasq
     expect(masq.isLoggedIn()).to.be.false
     expect(masq.isConnected()).to.be.false
   })
