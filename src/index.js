@@ -109,10 +109,16 @@ class Masq {
       return
     }
 
-    const db = common.utils.createPromisifiedHyperDB(this.userId)
-    this.userAppDb = db
-    await common.utils.dbReady(db)
-    this._startReplication()
+    try {
+      const db = common.utils.createPromisifiedHyperDB(this.userId)
+      this.userAppDb = db
+      await common.utils.dbReady(db)
+      this._startReplication()
+    } catch (e) {
+      if (this.isLoggedIn()) {
+        throw e
+      }
+    }
   }
 
   // function useful to simulate the shutdown of a User-app
@@ -227,8 +233,14 @@ class Masq {
     this.userAppRepSW = this._createSwarm(this.userAppRepHub)
 
     this.userAppRepSW.on('peer', async (peer, id) => {
-      const stream = this.userAppDb.replicate({ live: true })
-      pump(peer, stream, peer)
+      try {
+        const stream = this.userAppDb.replicate({ live: true })
+        pump(peer, stream, peer)
+      } catch (e) {
+        if (this.isLoggedIn()) {
+          throw e
+        }
+      }
     })
   }
 
