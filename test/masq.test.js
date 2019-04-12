@@ -2,6 +2,7 @@ const { expect } = require('chai')
 const signalhub = require('signalhubws')
 const swarm = require('webrtc-swarm')
 const common = require('masq-common')
+const MasqError = common.errors.MasqError
 
 const Masq = require('../src')
 const MasqAppMock = require('./mockMasqApp')
@@ -11,7 +12,6 @@ const APP_NAME = 'app1'
 const APP_DESCRIPTION = 'A wonderful app'
 const APP_IMAGE_URL = ' a link to image'
 const TIMEOUT = 20000
-const ERRORS = common.errors.ERRORS
 
 const { genRandomBuffer } = common.crypto
 
@@ -357,7 +357,7 @@ describe('Login procedure', function () {
     } catch (e) {
       err = e
     }
-    expect(err.type).to.equal(ERRORS.INVALID_KEY)
+    expect(err.code).to.equal(MasqError.INVALID_KEY)
   })
 
   it('should be kicked if wrong key is used', async () => {
@@ -376,7 +376,7 @@ describe('Login procedure', function () {
     } catch (e) {
       err = e
     }
-    expect(err.type).to.equal(ERRORS.UNABLE_TO_DECRYPT)
+    expect(err.code).to.equal(MasqError.UNABLE_TO_DECRYPT)
   })
 
   it('should fail when register is refused', async () => {
@@ -394,7 +394,8 @@ describe('Login procedure', function () {
     } catch (e) {
       err = e
     }
-    expect(err.type).to.equal(ERRORS.MASQ_ACCESS_REFUSED_BY_USER)
+    expect(err.code).to.equal(MasqError.MASQ_ACCESS_REFUSED_BY_USER)
+    expect(err.message).to.equal('Masq access refused by the user')
   })
 })
 
@@ -416,7 +417,7 @@ describe('Test data access and input', function () {
 
     for (let p of promises) {
       p.catch((e) => {
-        expect(e.type).to.equal(ERRORS.NOT_CONNECTED)
+        expect(e.code).to.equal(MasqError.NOT_CONNECTED)
         if (++count === promises.length) done()
       })
     }
