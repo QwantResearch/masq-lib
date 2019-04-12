@@ -208,7 +208,11 @@ class Masq {
     return new Promise((resolve, reject) => {
       // Subscribe to channel for a limited time to sync with masq
       debug(`Creation of a hub with ${channel} channel name`)
+
       const hub = signalhub(channel, this.config.hubUrls)
+      hub.on('error', ({ url, error }) => {
+        reject(new MasqError(MasqError.SIGNALLING_SERVER_ERROR, url, error))
+      })
       const sw = this._createSwarm(hub)
 
       sw.on('peer', (peer, id) => {
@@ -483,6 +487,11 @@ class Masq {
       () => {
         this._logIntoMasqDone = true
         if (this._onLogIntoMasqDone) this._onLogIntoMasqDone()
+      },
+      (e) => {
+        this._logIntoMasqErr = e
+        this._logIntoMasqDone = true
+        if (this._onLogIntoMasqDone) this._onLogIntoMasqDone()
       }
     )
 
@@ -573,4 +582,7 @@ class Masq {
   }
 }
 
-module.exports = Masq
+module.exports = {
+  Masq,
+  MasqError
+}

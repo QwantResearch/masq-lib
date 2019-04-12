@@ -4,7 +4,7 @@ const swarm = require('webrtc-swarm')
 const common = require('masq-common')
 const MasqError = common.errors.MasqError
 
-const Masq = require('../src')
+const Masq = require('../src').Masq
 const MasqAppMock = require('./mockMasqApp')
 const testConfig = require('../config/config.test.json')
 
@@ -524,5 +524,23 @@ describe('Test replication', function () {
     const expected = { 'key': 'hello', 'value': { 'data': 'world' } }
 
     expect(res).to.eql(expected)
+  })
+})
+
+describe('Test signalhub', function () {
+  it('throw error if signalhub is unreachable', async () => {
+    let err
+    try {
+      const testConfigFailingSignalhub = {
+        ...testConfig,
+        hubUrls: ['unreachableUrl']
+      }
+
+      const masq = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL, testConfigFailingSignalhub)
+      await masq.logIntoMasq(false)
+    } catch (e) {
+      err = e
+    }
+    expect(err.code).to.equal(MasqError.SIGNALLING_SERVER_ERROR)
   })
 })
