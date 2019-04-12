@@ -4,7 +4,6 @@ const uuidv4 = require('uuid/v4')
 const pump = require('pump')
 
 const common = require('masq-common')
-const ERRORS = common.errors.ERRORS
 const MasqError = common.errors.MasqError
 const CURRENT_USER_INFO_STR = 'currentUserInfo'
 
@@ -283,19 +282,19 @@ class Masq {
     switch (json.msg) {
       case 'authorized':
         if (!json.userAppDbId) {
-          throw new MasqError(ERRORS.WRONG_MESSAGE, 'User Id not found in \'authorized\' message')
+          throw new MasqError(MasqError.WRONG_MESSAGE, 'User Id not found in \'authorized\' message')
         }
         if (!json.userAppDEK) {
-          throw new MasqError(ERRORS.WRONG_MESSAGE, 'User app dataEncryptionKey (userAppDEK) not found in \'authorized\' message')
+          throw new MasqError(MasqError.WRONG_MESSAGE, 'User app dataEncryptionKey (userAppDEK) not found in \'authorized\' message')
         }
         if (!json.userAppNonce) {
-          throw new MasqError(ERRORS.WRONG_MESSAGE, 'User app nonce (userAppNonce) not found in \'authorized\' message')
+          throw new MasqError(MasqError.WRONG_MESSAGE, 'User app nonce (userAppNonce) not found in \'authorized\' message')
         }
         if (!json.username) {
-          throw new MasqError(ERRORS.WRONG_MESSAGE, 'Username not found in \'authorized\' message')
+          throw new MasqError(MasqError.WRONG_MESSAGE, 'Username not found in \'authorized\' message')
         }
         if (!(json.hasOwnProperty('profileImage'))) {
-          throw new MasqError(ERRORS.WRONG_MESSAGE, 'profileImage not found in \'authorized\' message')
+          throw new MasqError(MasqError.WRONG_MESSAGE, 'profileImage not found in \'authorized\' message')
         }
         break
 
@@ -304,44 +303,44 @@ class Masq {
 
       case 'masqAccessGranted':
         if (!registering) {
-          throw new MasqError(ERRORS.WRONG_MESSAGE, 'Unexpectedly received "masqAccessGranted" message while not registering')
+          throw new MasqError(MasqError.WRONG_MESSAGE, 'Unexpectedly received "masqAccessGranted" message while not registering')
         }
 
         if (!json.key) {
-          throw new MasqError(ERRORS.WRONG_MESSAGE, 'Database key not found in "masqAccessGranted" message')
+          throw new MasqError(MasqError.WRONG_MESSAGE, 'Database key not found in "masqAccessGranted" message')
         }
 
         if (!json.userAppDbId) {
-          throw new MasqError(ERRORS.WRONG_MESSAGE, 'User Id not found in "masqAccessGranted" message')
+          throw new MasqError(MasqError.WRONG_MESSAGE, 'User Id not found in "masqAccessGranted" message')
         }
         if (!json.userAppDEK) {
-          throw new MasqError(ERRORS.WRONG_MESSAGE, 'User app dataEncryptionKey (userAppDEK) not found in "masqAccessGranted" message')
+          throw new MasqError(MasqError.WRONG_MESSAGE, 'User app dataEncryptionKey (userAppDEK) not found in "masqAccessGranted" message')
         }
         if (!json.userAppNonce) {
-          throw new MasqError(ERRORS.WRONG_MESSAGE, 'User app nonce (userAppNonce) not found in "masqAccessGranted" message')
+          throw new MasqError(MasqError.WRONG_MESSAGE, 'User app nonce (userAppNonce) not found in "masqAccessGranted" message')
         }
         if (!json.username) {
-          throw new MasqError(ERRORS.WRONG_MESSAGE, 'Username not found in \'masqAccessGranted\' message')
+          throw new MasqError(MasqError.WRONG_MESSAGE, 'Username not found in \'masqAccessGranted\' message')
         }
         if (!(json.hasOwnProperty('profileImage'))) {
-          throw new MasqError(ERRORS.WRONG_MESSAGE, 'profileImage not found in \'masqAccessGranted\' message')
+          throw new MasqError(MasqError.WRONG_MESSAGE, 'profileImage not found in \'masqAccessGranted\' message')
         }
         break
 
       case 'masqAccessRefused':
         if (!registering) {
-          throw new MasqError(ERRORS.WRONG_MESSAGE, 'Unexpectedly received "masqAccessRefused" while not registering')
+          throw new MasqError(MasqError.WRONG_MESSAGE, 'Unexpectedly received "masqAccessRefused" while not registering')
         }
         break
 
       case 'writeAccessGranted':
         if (!waitingForWriteAccess) {
-          throw new MasqError(ERRORS.WRONG_MESSAGE, 'Unexpectedly received "writeAccessGranted" while not waiting for write access')
+          throw new MasqError(MasqError.WRONG_MESSAGE, 'Unexpectedly received "writeAccessGranted" while not waiting for write access')
         }
         break
 
       default:
-        throw new MasqError(ERRORS.WRONG_MESSAGE, `Unexpectedly received message with type ${json.msg}`)
+        throw new MasqError(MasqError.WRONG_MESSAGE, `Unexpectedly received message with type ${json.msg}`)
     }
   }
 
@@ -460,7 +459,7 @@ class Masq {
 
         case 'masqAccessRefused':
           registering = false
-          handleError(new MasqError(ERRORS.MASQ_ACCESS_REFUSED_BY_USER))
+          handleError(new MasqError(MasqError.MASQ_ACCESS_REFUSED_BY_USER))
           return
 
         case 'writeAccessGranted':
@@ -515,7 +514,7 @@ class Masq {
   //
 
   _getDB () {
-    if (!this.userAppDb) throw new MasqError(ERRORS.NOT_CONNECTED)
+    if (!this.userAppDb) throw new MasqError(MasqError.NOT_CONNECTED)
     return this.userAppDb
   }
 
