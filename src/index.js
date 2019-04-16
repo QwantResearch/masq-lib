@@ -26,7 +26,7 @@ class Masq {
   constructor (appName, appDescription, appImageURL, options = {}) {
     this._reset()
 
-    this.eventTarget = new EventTarget()
+    this.eventTarget = document.createElement('MasqLib')
 
     this.appName = appName
     this.appDescription = appDescription
