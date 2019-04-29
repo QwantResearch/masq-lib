@@ -50,6 +50,7 @@ async function logInWithMasqAppMock (stayConnected) {
 
 beforeEach(async () => {
   masq = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL, testConfig)
+  await masq.init()
   mockMasqApp = new MasqAppMock()
   await mockMasqApp.init()
 })
@@ -107,33 +108,51 @@ describe('Login procedure', function () {
       })
     })
 
-    await Promise.all([waitForPeer, masq.logIntoMasq(false)])
+    let err
+    try {
+      await Promise.all([waitForPeer, masq.logIntoMasq(false)])
+    } catch (e) {
+      err = e
+    }
+    expect(err.code).to.equal(MasqError.DISCONNECTED_DURING_LOGIN)
     expect(peersLength).to.equal(1)
   })
 
-  it('isLoggedIn and isConnected should return false', async () => {
+  it('isLoggedIn and isReplicating should return false', async () => {
     expect(masq.isLoggedIn()).to.be.false
-    expect(masq.isConnected()).to.be.false
+    expect(masq.isReplicating()).to.be.false
   })
 
-  it('isLoggedIn and isConnected should return true after successful login', async () => {
+  it('isLoggedIn and isReplicating should return true after successful login', async () => {
     expect(masq.isLoggedIn()).to.be.false
-    expect(masq.isConnected()).to.be.false
-    await logInWithMasqAppMock(false)
+    expect(masq.isReplicating()).to.be.false
+    let err = false
+    try {
+      await logInWithMasqAppMock(false)
+    } catch (e) {
+      err = true
+      console.error(JSON.stringify(e))
+    }
+    expect(err).to.be.false
     expect(masq.isLoggedIn()).to.be.true
-    expect(masq.isConnected()).to.be.true
+    expect(masq.isReplicating()).to.be.true
   })
 
   it('should login and signout correctly', async () => {
     expect(masq.isLoggedIn()).to.be.false
-    expect(masq.isConnected()).to.be.false
+    expect(masq.isReplicating()).to.be.false
     await logInWithMasqAppMock(true)
     expect(masq.isLoggedIn()).to.be.true
-    expect(masq.isConnected()).to.be.true
+    expect(masq.isReplicating()).to.be.true
     await masq.signout()
     expect(masq.isLoggedIn()).to.be.false
-    expect(masq.isConnected()).to.be.false
+    expect(masq.isReplicating()).to.be.false
   })
+
+  const _deleteSessionStorage = () => {
+    const CURRENT_USER_INFO_STR = 'currentUserInfo'
+    window.sessionStorage.removeItem(CURRENT_USER_INFO_STR)
+  }
 
   it('should be able to connect with new Masq instance after logging in with stayConnected and disconnecting', async () => {
     expect(masq.isLoggedIn()).to.be.false
@@ -145,17 +164,16 @@ describe('Login procedure', function () {
     const res = await masq.get(key)
     expect(res).to.eql(value)
     expect(masq.isLoggedIn()).to.be.true
-    await masq._disconnect()
-    expect(masq.isLoggedIn()).to.be.true
-    expect(masq.isConnected()).to.be.false
+    await _deleteSessionStorage()
 
     // reconnect with new Masq instance
     const masq2 = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL, testConfig)
+    await masq2.init()
     expect(masq2.isLoggedIn()).to.be.true
-    expect(masq2.isConnected()).to.be.false
-    await masq2.connectToMasq()
+    expect(masq2.isReplicating()).to.be.true
+    await masq2.startReplication()
     expect(masq2.isLoggedIn()).to.be.true
-    expect(masq2.isConnected()).to.be.true
+    expect(masq2.isReplicating()).to.be.true
     const key2 = '/hello2'
     const value2 = { data: 'world2' }
     await masq2.put(key2, value2)
@@ -169,20 +187,19 @@ describe('Login procedure', function () {
     expect(masq.isLoggedIn()).to.be.false
     await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).to.be.true
-    await masq._disconnect()
-    expect(masq.isLoggedIn()).to.be.true
-    expect(masq.isConnected()).to.be.false
+    await _deleteSessionStorage()
 
     // reconnect with new Masq instance (masq2)
     const masq2 = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL, testConfig)
+    await masq2.init()
     expect(masq2.isLoggedIn()).to.be.false
-    expect(masq2.isConnected()).to.be.false
+    expect(masq2.isReplicating()).to.be.false
 
-    await masq2.connectToMasq()
+    await masq2.startReplication()
 
-    // we should not be logged in or connected even after connectToMasq
+    // we should not be logged in or replicating even after startReplication
     expect(masq2.isLoggedIn()).to.be.false
-    expect(masq2.isConnected()).to.be.false
+    expect(masq2.isReplicating()).to.be.false
 
     // connect with masq2
     mockMasqApp.destroy()
@@ -194,7 +211,7 @@ describe('Login procedure', function () {
     ])
 
     expect(masq2.isLoggedIn()).to.be.true
-    expect(masq2.isConnected()).to.be.true
+    expect(masq2.isReplicating()).to.be.true
 
     // put with masq2
     const key = '/hello'
@@ -207,70 +224,70 @@ describe('Login procedure', function () {
     await masq2.signout()
   })
 
-  it('should be able to repeat login-disconnect-connect-signout', async () => {
+  it('should be able to repeat login-stopReplication-startReplication-signout', async () => {
     expect(masq.isLoggedIn()).to.be.false
 
     for (let i = 0; i < 2; i++) {
       await logInWithMasqAppMock(false)
       expect(masq.isLoggedIn()).to.be.true
-      expect(masq.isConnected()).to.be.true
+      expect(masq.isReplicating()).to.be.true
 
-      await masq._disconnect()
+      await masq.stopReplication()
       expect(masq.isLoggedIn()).to.be.true
-      expect(masq.isConnected()).to.be.false
+      expect(masq.isReplicating()).to.be.false
 
-      await masq.connectToMasq()
+      await masq.startReplication()
       expect(masq.isLoggedIn()).to.be.true
-      expect(masq.isConnected()).to.be.true
+      expect(masq.isReplicating()).to.be.true
 
       await masq.signout()
       expect(masq.isLoggedIn()).to.be.false
-      expect(masq.isConnected()).to.be.false
+      expect(masq.isReplicating()).to.be.false
     }
   })
 
   it('should fail when connect without prior login', async () => {
     expect(masq.isLoggedIn()).to.be.false
-    await masq.connectToMasq()
+    await masq.startReplication()
 
-    // we should not be logged in or connected even after connectToMasq
+    // we should not be logged in or replicating even after startReplication
     expect(masq.isLoggedIn()).to.be.false
-    expect(masq.isConnected()).to.be.false
+    expect(masq.isReplicating()).to.be.false
   })
 
-  it('should fail when connect after signout without prior login', async () => {
+  it('should fail when startReplication after signout without prior login', async () => {
     expect(masq.isLoggedIn()).to.be.false
 
     await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).to.be.true
-    expect(masq.isConnected()).to.be.true
+    expect(masq.isReplicating()).to.be.true
 
-    await masq._disconnect()
+    await masq.stopReplication()
     expect(masq.isLoggedIn()).to.be.true
-    expect(masq.isConnected()).to.be.false
+    expect(masq.isReplicating()).to.be.false
 
-    await masq.connectToMasq()
+    await masq.startReplication()
     expect(masq.isLoggedIn()).to.be.true
-    expect(masq.isConnected()).to.be.true
+    expect(masq.isReplicating()).to.be.true
 
     await masq.signout()
     expect(masq.isLoggedIn()).to.be.false
-    expect(masq.isConnected()).to.be.false
+    expect(masq.isReplicating()).to.be.false
 
     // Trying to reconnect without login should have no effect
-    await masq.connectToMasq()
+    await masq.startReplication()
 
-    // we should not be logged in or connected even after connectToMasq
+    // we should not be logged in or replicating even after startReplication
     expect(masq.isLoggedIn()).to.be.false
-    expect(masq.isConnected()).to.be.false
+    expect(masq.isReplicating()).to.be.false
   })
 
-  it('should be able to disconnect even if not logged in nor connected', async () => {
+  it('should be able to disconnect even if not logged in nor replicating', async () => {
     expect(masq.isLoggedIn()).to.be.false
-    expect(masq.isConnected()).to.be.false
-    await masq._disconnect()
+    expect(masq.isReplicating()).to.be.false
+    await masq.stopReplication()
     expect(masq.isLoggedIn()).to.be.false
-    expect(masq.isConnected()).to.be.false
+    expect(masq.isReplicating()).to.be.false
   })
 
   it('should be able to disconnect more than once, then reconnect without error', async () => {
@@ -278,19 +295,19 @@ describe('Login procedure', function () {
 
     await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).to.be.true
-    expect(masq.isConnected()).to.be.true
+    expect(masq.isReplicating()).to.be.true
 
-    await masq._disconnect()
+    await masq.stopReplication()
     expect(masq.isLoggedIn()).to.be.true
-    expect(masq.isConnected()).to.be.false
+    expect(masq.isReplicating()).to.be.false
 
-    await masq._disconnect()
+    await masq.stopReplication()
     expect(masq.isLoggedIn()).to.be.true
-    expect(masq.isConnected()).to.be.false
+    expect(masq.isReplicating()).to.be.false
 
-    await masq.connectToMasq()
+    await masq.startReplication()
     expect(masq.isLoggedIn()).to.be.true
-    expect(masq.isConnected()).to.be.true
+    expect(masq.isReplicating()).to.be.true
   })
 
   it('should be able to connect more than once without error', async () => {
@@ -298,19 +315,19 @@ describe('Login procedure', function () {
 
     await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).to.be.true
-    expect(masq.isConnected()).to.be.true
+    expect(masq.isReplicating()).to.be.true
 
-    await masq._disconnect()
+    await masq.stopReplication()
     expect(masq.isLoggedIn()).to.be.true
-    expect(masq.isConnected()).to.be.false
+    expect(masq.isReplicating()).to.be.false
 
-    await masq.connectToMasq()
+    await masq.startReplication()
     expect(masq.isLoggedIn()).to.be.true
-    expect(masq.isConnected()).to.be.true
+    expect(masq.isReplicating()).to.be.true
 
-    await masq.connectToMasq()
+    await masq.startReplication()
     expect(masq.isLoggedIn()).to.be.true
-    expect(masq.isConnected()).to.be.true
+    expect(masq.isReplicating()).to.be.true
   })
 
   it('should be able to sign out more than once without error', async () => {
@@ -318,15 +335,15 @@ describe('Login procedure', function () {
 
     await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).to.be.true
-    expect(masq.isConnected()).to.be.true
+    expect(masq.isReplicating()).to.be.true
 
     await masq.signout()
     expect(masq.isLoggedIn()).to.be.false
-    expect(masq.isConnected()).to.be.false
+    expect(masq.isReplicating()).to.be.false
 
     await masq.signout()
     expect(masq.isLoggedIn()).to.be.false
-    expect(masq.isConnected()).to.be.false
+    expect(masq.isReplicating()).to.be.false
   })
 
   it('should be able to login more than once without error', async () => {
@@ -334,11 +351,11 @@ describe('Login procedure', function () {
 
     await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).to.be.true
-    expect(masq.isConnected()).to.be.true
+    expect(masq.isReplicating()).to.be.true
 
     await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).to.be.true
-    expect(masq.isConnected()).to.be.true
+    expect(masq.isReplicating()).to.be.true
   })
 
   it('should be kicked if key is invalid', async () => {
@@ -399,13 +416,13 @@ describe('Login procedure', function () {
   })
 })
 
-// // TODO add tests for unexpected message received
-// // TODO add tests for connect-disconnect-connect
+// TODO add tests for unexpected message received
+// TODO add tests for connect-disconnect-connect
 
 describe('Test data access and input', function () {
   this.timeout(TIMEOUT)
 
-  it('operations should fail if masq is not connected', (done) => {
+  it('operations should fail if masq is not replicating', (done) => {
     let count = 0
     const promises = [
       masq.watch('key'),
@@ -501,7 +518,7 @@ describe('Test data access and input', function () {
     const key = '/hello'
     const value = { data: 'world' }
     masq.watch('/hello', resolveOnChange)
-    await mockMasqApp.put(masq.userId, key, value)
+    await mockMasqApp.put(masq.userAppDbId, key, value)
     await waitForChange
   })
 })
@@ -513,13 +530,13 @@ describe('Test replication', function () {
 
     let resolveOnChange
     const waitForChange = new Promise((resolve) => { resolveOnChange = resolve })
-    mockMasqApp.watch(masq.userId, '/hello', resolveOnChange)
+    mockMasqApp.watch(masq.userAppDbId, '/hello', resolveOnChange)
 
     const key = '/hello'
     const value = { data: 'world' }
     await masq.put(key, value)
     await waitForChange
-    const res = await mockMasqApp.get(masq.userId, '/hello')
+    const res = await mockMasqApp.get(masq.userAppDbId, '/hello')
     // Because we hash the keys, we include the key name inside the value
     const expected = { 'key': 'hello', 'value': { 'data': 'world' } }
 

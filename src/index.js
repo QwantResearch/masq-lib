@@ -19,29 +19,12 @@ const debug = (function () {
 })()
 
 class Masq {
-  /**
-   * constructor
-   * @param {string} appName - The application name
-   */
   constructor (appName, appDescription, appImageURL, options = {}) {
-    this._reset()
-
     this.eventTarget = document.createElement('MasqLib')
 
     this.appName = appName
     this.appDescription = appDescription
     this.appImageURL = appImageURL
-
-    this.userId = null
-    this.dataEncryptionKey = null
-    this.userAppDb = null
-
-    this._loadSessionInfo()
-
-    // login state data
-    this.loginChannel = null
-    this.loginKey = null
-    this.loginUrl = null
 
     // override config with constructor options
     this.config = {
@@ -50,8 +33,80 @@ class Masq {
       swarmConfig: options.swarmConfig ? options.swarmConfig : jsonConfig.swarmConfig
     }
 
+    // init state
+    this.setState('notLogged')
+
+    // init state through async function
+    // this.init should be awaited to make sure state is initialized
+    this.initPromise = this._init()
+
+    // login state data
+    this.stayConnected = false
+    this.loginChannel = null
+    this.loginKey = null
+    this.loginSw = null
+    this.loginPeer = null
+
+    // reset replication variables
+    this.userAppRepSW = null
+    this.userAppRepHub = null
+
+    // setup listeners
     this._listenForLoginOrSignout()
     this._listenForFocus()
+  }
+
+  setState (newState) {
+    const currState = this.state
+    switch (newState) {
+      case 'notLogged':
+        break
+      case 'userAppDbCreated':
+        break
+      case 'accessMaterialReceived':
+        break
+      case 'registerNeeded':
+        break
+      case 'authorized':
+        break
+      case 'loggingIn':
+        break
+      case 'logged':
+        if (currState !== 'notLogged' &&
+            currState !== 'authorized' &&
+            currState !== 'userAppDbCreated' &&
+            currState !== 'replicating') {
+          throw new MasqError(
+            MasqError.INVALID_STATE_TRANSITION,
+            'state transition invalid: ' + currState + ' -> ' + newState)
+        }
+        // dispatch event logged_in if the transition is not from replicating
+        if (currState !== 'replicating') {
+          debug('[masq.setState] dispatched event: logged_in')
+          this.eventTarget.dispatchEvent(new Event('logged_in'))
+        }
+        break
+      case 'replicating':
+        break
+      default:
+        throw new MasqError()
+    }
+    debug('[masq.setState] changing state : ' + currState + ' -> ' + newState)
+    this.state = newState
+  }
+
+  async init () {
+    await this.initPromise
+  }
+
+  async _init () {
+    // try to login from session info
+    await this._loadSessionInfo()
+
+    // get login channel and key created at login link generation
+    // sets this.loginKey and this.loginChannel
+    // TODO check login link lifecycle
+    await this._genLoginLink()
   }
 
   _listenForLoginOrSignout () {
@@ -62,7 +117,8 @@ class Masq {
             await this.signout()
           }
         } else if (e.newValue) {
-          await this.connectToMasq()
+          await this._loadSessionInfo()
+          debug('[masq._listenForLoginOrSignout] dispatch logged_in')
           this.eventTarget.dispatchEvent(new Event('logged_in'))
         }
       }
@@ -70,9 +126,53 @@ class Masq {
   }
 
   _listenForFocus () {
-    document.addEventListener('focus', () => {
-      this.connectToMasq()
+    document.addEventListener('focus', async () => {
+      // try to reopen db
+      if (!this.isLoggedIn()) {
+        return
+      }
+      await this._openDb()
+      this.startReplication()
     })
+  }
+
+  async _loadSessionInfo () {
+    const auxLoginFromUserInfo = async (currentUserInfo) => {
+      const { userAppDbId, userAppDEK, userAppNonce } = JSON.parse(currentUserInfo)
+      this.userAppDbId = userAppDbId
+      this.userAppDEK = userAppDEK
+      this.importedUserAppDEK = await common.crypto.importKey(Buffer.from(userAppDEK, 'hex'))
+      this.userAppNonce = userAppNonce
+      this.setState('logged')
+      await this._openDb()
+      this.startReplication()
+    }
+
+    // If user info is stored in session storage, do not use localStorage
+    const currentUserInfo = window.sessionStorage.getItem(CURRENT_USER_INFO_STR)
+    if (currentUserInfo) {
+      await auxLoginFromUserInfo(currentUserInfo)
+      return
+    }
+
+    // if userId is is not in session storage, look for it in local storage
+    // and save in session storage
+    const localStorageCurrentUserInfo = window.localStorage.getItem(CURRENT_USER_INFO_STR)
+    if (localStorageCurrentUserInfo) {
+      await auxLoginFromUserInfo(localStorageCurrentUserInfo)
+      window.sessionStorage.setItem(CURRENT_USER_INFO_STR, localStorageCurrentUserInfo)
+    }
+  }
+
+  async _openDb () {
+    try {
+      this.userAppDb = common.utils.createPromisifiedHyperDB(this.userAppDbId)
+      await common.utils.dbReady(this.userAppDb)
+    } catch (e) {
+      if (this.isLoggedIn()) {
+        throw e
+      }
+    }
   }
 
   _createSwarm (hub) {
@@ -81,115 +181,60 @@ class Masq {
     })
   }
 
-  _reset () {
-    this.userAppRepSW = null
-    this.userAppRepHub = null
-
-    this._logIntoMasqErr = null
-    this._logIntoMasqDone = false
-  }
-
-  isLoggedIn () {
-    // is logged in if the userAppDbId is known
-    // (either after register or after construction and load session info)
-    return !!this.userId
-  }
-
-  isConnected () {
-    // is connected if the userAppDb has been created and initialized
-    return !!this.userAppDb
-  }
-
-  async connectToMasq () {
-    await this._loadSessionInfo()
-
-    if (!this.isLoggedIn()) {
-      await this._disconnect()
+  startReplication () {
+    debug('[masq.startReplication]')
+    if (this.state !== 'logged') {
       return
     }
 
     try {
-      const db = common.utils.createPromisifiedHyperDB(this.userId)
-      this.userAppDb = db
-      await common.utils.dbReady(db)
-      this._startReplication()
+      this.userAppDb.discoveryKey.toString('hex')
     } catch (e) {
-      if (this.isLoggedIn()) {
-        throw e
-      }
+      console.error(e)
     }
+    const discoveryKey = this.userAppDb.discoveryKey.toString('hex')
+    this.userAppRepHub = signalhub(discoveryKey, this.config.hubUrls)
+    this.userAppRepSW = this._createSwarm(this.userAppRepHub)
+
+    this.setState('replicating')
+    this.userAppRepSW.on('peer', (peer, id) => {
+      try {
+        const stream = this.userAppDb.replicate({ live: true })
+        pump(peer, stream, peer)
+      } catch (e) {
+        if (this.isLoggedIn()) {
+          throw e
+        }
+      }
+    })
   }
 
-  // function useful to simulate the shutdown of a User-app
-  async _disconnect () {
+  async stopReplication () {
+    debug('[masq.stopReplication]')
     await new Promise((resolve) => {
-      this.userAppDb = null
       if (!this.userAppRepSW) {
-        this._reset()
         resolve()
-        return
       }
       this.userAppRepSW.close(() => {
-        this._reset()
         resolve()
       })
     })
 
-    await this._deleteSessionInfo(false)
+    // reset replication variables
+    this.userAppRepSW = null
+    this.userAppRepHub = null
+
+    if (this.state === 'replicating') {
+      this.setState('logged')
+    }
   }
 
-  async signout () {
-    this.userId = null
-    this.userAppDb = null
-
-    await this._disconnect()
-    this._deleteSessionInfo(true)
-    this.eventTarget.dispatchEvent(new Event('signed_out'))
+  isReplicating () {
+    return (this.state === 'replicating')
   }
 
-  _deleteSessionInfo (deleteLocal) {
-    if (deleteLocal) {
-      window.localStorage.removeItem(CURRENT_USER_INFO_STR)
-    }
-    window.sessionStorage.removeItem(CURRENT_USER_INFO_STR)
-  }
-
-  _storeSessionInfo (stayConnected, userId, dataEncryptionKey, username, profileImage, nonce) {
-    const currenUserInfo = {
-      userId,
-      dataEncryptionKey,
-      username,
-      profileImage,
-      nonce
-    }
-    if (stayConnected) {
-      window.localStorage.setItem(CURRENT_USER_INFO_STR, JSON.stringify(currenUserInfo))
-    }
-    window.sessionStorage.setItem(CURRENT_USER_INFO_STR, JSON.stringify(currenUserInfo))
-  }
-
-  async _loadSessionInfo () {
-    // If userId is in sesssion storage, use it and do not touch localStorage
-    const currentUserInfo = window.sessionStorage.getItem(CURRENT_USER_INFO_STR)
-
-    if (currentUserInfo) {
-      const { userId, dataEncryptionKey, nonce } = JSON.parse(currentUserInfo)
-      this.userId = userId
-      this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
-      this.nonce = nonce
-      return
-    }
-
-    // if userId is is not in session storage, look for it in local storage
-    // and save in session storage
-    const localStorageCurrentUserInfo = window.localStorage.getItem(CURRENT_USER_INFO_STR)
-    if (localStorageCurrentUserInfo) {
-      const { userId, dataEncryptionKey, nonce } = JSON.parse(localStorageCurrentUserInfo)
-      this.userId = userId
-      this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
-      this.nonce = nonce
-      window.sessionStorage.setItem(CURRENT_USER_INFO_STR, localStorageCurrentUserInfo)
-    }
+  isLoggedIn () {
+    return (this.state === 'logged' || this.state === 'replicating')
   }
 
   async getUsername () {
@@ -204,151 +249,7 @@ class Masq {
     return JSON.parse(currentUserInfo).profileImage
   }
 
-  async _initSwarmWithDataHandler (channel, dataHandler) {
-    return new Promise((resolve, reject) => {
-      // Subscribe to channel for a limited time to sync with masq
-      debug(`Creation of a hub with ${channel} channel name`)
-
-      const hub = signalhub(channel, this.config.hubUrls)
-      hub.on('error', ({ url, error }) => {
-        reject(new MasqError(MasqError.SIGNALLING_SERVER_ERROR, url, error))
-      })
-      const sw = this._createSwarm(hub)
-
-      sw.on('peer', (peer, id) => {
-        debug(`The peer ${id} join us...`)
-        peer.on('data', (data) => { dataHandler(sw, peer, data) })
-      })
-
-      sw.on('disconnect', (peer, id) => {
-        sw.close()
-      })
-
-      sw.on('close', () => {
-        resolve()
-      })
-    })
-  }
-
-  _startReplication () {
-    const discoveryKey = this.userAppDb.discoveryKey.toString('hex')
-    this.userAppRepHub = signalhub(discoveryKey, this.config.hubUrls)
-    this.userAppRepSW = this._createSwarm(this.userAppRepHub)
-
-    this.userAppRepSW.on('peer', async (peer, id) => {
-      try {
-        const stream = this.userAppDb.replicate({ live: true })
-        pump(peer, stream, peer)
-      } catch (e) {
-        if (this.isLoggedIn()) {
-          throw e
-        }
-      }
-    })
-  }
-
-  async _isRegistered (userId) {
-    // is registered if there is a db for this userId
-    return common.utils.dbExists(userId)
-  }
-
-  async _requestUserAppRegister (key, peer) {
-    const msg = {
-      msg: 'registerUserApp',
-      name: this.appName,
-      description: this.appDescription,
-      imageURL: this.appImageURL
-    }
-    let encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
-    peer.send(JSON.stringify(encryptedMsg))
-  }
-
-  async _requestWriteAccess (encryptionKey, peer, localDbKey) {
-    const msg = {
-      msg: 'requestWriteAccess',
-      key: localDbKey.toString('hex')
-    }
-    const encryptedMsg = await common.crypto.encrypt(encryptionKey, msg, 'base64')
-    peer.send(JSON.stringify(encryptedMsg))
-  }
-
-  async _sendConnectionEstablished (key, peer) {
-    const msg = {
-      msg: 'connectionEstablished'
-    }
-    const encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
-
-    peer.send(JSON.stringify(encryptedMsg))
-  }
-
-  // All error handling for received messages
-  _checkMessage (json, registering, waitingForWriteAccess) {
-    switch (json.msg) {
-      case 'authorized':
-        if (!json.userAppDbId) {
-          throw new MasqError(MasqError.WRONG_MESSAGE, 'User Id not found in \'authorized\' message')
-        }
-        if (!json.userAppDEK) {
-          throw new MasqError(MasqError.WRONG_MESSAGE, 'User app dataEncryptionKey (userAppDEK) not found in \'authorized\' message')
-        }
-        if (!json.userAppNonce) {
-          throw new MasqError(MasqError.WRONG_MESSAGE, 'User app nonce (userAppNonce) not found in \'authorized\' message')
-        }
-        if (!json.username) {
-          throw new MasqError(MasqError.WRONG_MESSAGE, 'Username not found in \'authorized\' message')
-        }
-        if (!(json.hasOwnProperty('profileImage'))) {
-          throw new MasqError(MasqError.WRONG_MESSAGE, 'profileImage not found in \'authorized\' message')
-        }
-        break
-
-      case 'notAuthorized':
-        break
-
-      case 'masqAccessGranted':
-        if (!registering) {
-          throw new MasqError(MasqError.WRONG_MESSAGE, 'Unexpectedly received "masqAccessGranted" message while not registering')
-        }
-
-        if (!json.key) {
-          throw new MasqError(MasqError.WRONG_MESSAGE, 'Database key not found in "masqAccessGranted" message')
-        }
-
-        if (!json.userAppDbId) {
-          throw new MasqError(MasqError.WRONG_MESSAGE, 'User Id not found in "masqAccessGranted" message')
-        }
-        if (!json.userAppDEK) {
-          throw new MasqError(MasqError.WRONG_MESSAGE, 'User app dataEncryptionKey (userAppDEK) not found in "masqAccessGranted" message')
-        }
-        if (!json.userAppNonce) {
-          throw new MasqError(MasqError.WRONG_MESSAGE, 'User app nonce (userAppNonce) not found in "masqAccessGranted" message')
-        }
-        if (!json.username) {
-          throw new MasqError(MasqError.WRONG_MESSAGE, 'Username not found in \'masqAccessGranted\' message')
-        }
-        if (!(json.hasOwnProperty('profileImage'))) {
-          throw new MasqError(MasqError.WRONG_MESSAGE, 'profileImage not found in \'masqAccessGranted\' message')
-        }
-        break
-
-      case 'masqAccessRefused':
-        if (!registering) {
-          throw new MasqError(MasqError.WRONG_MESSAGE, 'Unexpectedly received "masqAccessRefused" while not registering')
-        }
-        break
-
-      case 'writeAccessGranted':
-        if (!waitingForWriteAccess) {
-          throw new MasqError(MasqError.WRONG_MESSAGE, 'Unexpectedly received "writeAccessGranted" while not waiting for write access')
-        }
-        break
-
-      default:
-        throw new MasqError(MasqError.WRONG_MESSAGE, `Unexpectedly received message with type ${json.msg}`)
-    }
-  }
-
-  async getLoginLink () {
+  async _genLoginLink () {
     this.loginChannel = uuidv4()
     this.loginKey = await common.crypto.genAESKey(true, 'AES-GCM', 128)
     const extractedKey = await common.crypto.exportKey(this.loginKey)
@@ -358,227 +259,368 @@ class Masq {
     const hashParams = JSON.stringify([this.appName, requestType, this.loginChannel, keyBase64])
     this.loginUrl.hash = '/link/' + Buffer.from(hashParams).toString('base64')
 
-    return this.loginUrl.href
+    this.loginLink = this.loginUrl.href
   }
 
-  /**
-   * If this is the first time, this.dbs.profiles is empty.
-   * We need to get masq-profiles hyperdb key of masq.
-   * @returns {string, string, string}
-   *  link - the link to open the masq app with the right
-   */
+  async getLoginLink () {
+    return this.loginLink
+  }
+
   async logIntoMasq (stayConnected) {
-    // logout if loggedin when called
-    if (this.userId) {
-      this.signout()
-    }
+    this.setState('loggingIn')
 
-    // make stayConnected a boolean
-    stayConnected = !!stayConnected
+    // make stayConnected i boolean
+    this.stayConnected = !!stayConnected
 
-    // get login channel and key created at login link generation
-    const channel = this.loginChannel
-    const key = this.loginKey
+    let pr = new Promise((resolve, reject) => {
+      // Subscribe to channel for a limited time to sync with masq
+      debug(`Creation of a hub with ${this.loginChannel} channel name`)
 
-    let registering = false
-    let waitingForWriteAccess = false
+      const hub = signalhub(this.loginChannel, this.config.hubUrls)
+      hub.on('error', ({ url, error }) => {
+        reject(new MasqError(MasqError.SIGNALLING_SERVER_ERROR, url, error))
+      })
 
-    let userId
-    let db
-    let dataEncryptionKey
-    let username
-    let profileImage
-    let nonce
-    this._logIntoMasqErr = null
+      this.loginSw = this._createSwarm(hub)
 
-    const handleData = async (sw, peer, data) => {
-      const handleError = (err) => {
-        this._logIntoMasqErr = err
-        sw.close()
-      }
+      let dataReceived = false
 
-      // decrypt the received message and check if the right key has been used
-      let json
-      try {
-        json = await common.crypto.decrypt(key, JSON.parse(data), 'base64')
-        this._checkMessage(json, registering, waitingForWriteAccess)
-      } catch (err) {
-        handleError(err)
-        return
-      }
+      this.loginSw.on('peer', (peer, id) => {
+        debug(`The peer ${id} join us...`)
+        this.loginPeer = peer
 
-      switch (json.msg) {
-        case 'authorized':
+        this.loginPeer.once('data', async (data) => {
+          dataReceived = true
+          try {
+            // decrypt the received message and check if the right key has been used
+            const json = await common.crypto.decrypt(this.loginKey, JSON.parse(data), 'base64')
+            // this._checkMessage(json, registering, waitingForWriteAccess)
 
-          userId = json.userAppDbId
-          dataEncryptionKey = json.userAppDEK
-          nonce = json.userAppNonce
-          username = json.username
-          profileImage = json.profileImage
+            switch (json.msg) {
+              case 'authorized':
+                await this._receivedAuthorized(json)
+                break
 
-          // Check if the User-app is already registered
-          if (await this._isRegistered(userId)) {
-            this.userId = userId
-            // store the dataEncryptionKey as a CryptoKey
-            this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
+              case 'notAuthorized':
+                // if this User-app is not registered
+                await this._receiveNotAuthorized()
+                break
 
-            this.nonce = nonce
-
-            // Store the session info
-            this._storeSessionInfo(stayConnected, userId, dataEncryptionKey, username, profileImage, nonce)
-
-            await this.connectToMasq()
-            // logged into Masq
-            await this._sendConnectionEstablished(key, peer)
-            sw.close()
-            return
+              default:
+                // TODO change error
+                throw new MasqError(MasqError.WRONG_MESSAGE, `Unexpectedly received message with type ${json.code}`)
+            }
+            resolve()
+          } catch (e) {
+            await this._resetLogin()
+            reject(e)
           }
-          // if this UserApp instance is not registered
-          registering = true
-          this._requestUserAppRegister(key, peer)
-          break
+        })
 
-        case 'notAuthorized':
-          // if this User-app is not registered
-          registering = true
-          this._requestUserAppRegister(key, peer)
-          break
+        this.loginSw.on('disconnect', async (peer, id) => {
+          debug('[masq.logIntoMasq] disconnect')
+          if (!dataReceived) {
+            reject(new MasqError(MasqError.DISCONNECTED_DURING_LOGIN))
+          }
+        })
 
-        case 'masqAccessGranted':
-          registering = false
+        this.loginSw.on('close', () => {
+          debug('[masq.logIntoMasq] close')
+        })
+      })
+    })
 
-          userId = json.userAppDbId
-          dataEncryptionKey = json.userAppDEK
-          username = json.username
-          nonce = json.userAppNonce
-          profileImage = json.profileImage
+    try {
+      await pr
+      this.loginSw.close()
+    } catch (e) {
+      await this._resetLogin()
+      throw e
+    }
+  }
 
-          const buffKey = Buffer.from(json.key, 'hex')
-          db = common.utils.createPromisifiedHyperDB(userId, buffKey)
-          await common.utils.dbReady(db)
+  async _resetLogin () {
+    this._deleteSessionInfo()
 
-          waitingForWriteAccess = true
-          this._requestWriteAccess(key, peer, db.local.key)
-          break
-
-        case 'masqAccessRefused':
-          registering = false
-          handleError(new MasqError(MasqError.MASQ_ACCESS_REFUSED_BY_USER))
-          return
-
-        case 'writeAccessGranted':
-          waitingForWriteAccess = false
-
-          // Store the session info
-          this._storeSessionInfo(stayConnected, userId, dataEncryptionKey, username, profileImage, nonce)
-          this.userId = userId
-          this.nonce = nonce
-          this.dataEncryptionKey = await common.crypto.importKey(Buffer.from(dataEncryptionKey, 'hex'))
-
-          this.userAppDb = db
-          this._startReplication()
-
-          sw.close()
-          break
+    // clear state
+    this.stayConnected = false
+    this.loginChannel = null
+    this.loginKey = null
+    this.loginUrl = null
+    if (this.loginSw) {
+      if (!this.loginSw.closed) {
+        await new Promise((resolve) => {
+          this.loginSw.close(() => {
+            resolve()
+          })
+        })
       }
     }
+    this.loginSw = null
+    this.loginPeer = null
+    this.username = null
+    this.profileImage = null
+    this.userAppDbId = null
+    this.userAppDEK = null
+    this.importedUserAppDEK = null
+    this.userAppNonce = null
+    this.userAppDb = null
 
-    this._initSwarmWithDataHandler(channel, handleData).then(
-      () => {
-        this._logIntoMasqDone = true
-        if (this._onLogIntoMasqDone) this._onLogIntoMasqDone()
-      },
-      (e) => {
-        this._logIntoMasqErr = e
-        this._logIntoMasqDone = true
-        if (this._onLogIntoMasqDone) this._onLogIntoMasqDone()
-      }
+    await this.stopReplication()
+
+    await this._genLoginLink()
+
+    this.setState('notLogged')
+  }
+
+  async _receivedAuthorized (json) {
+    debug('[masq._receiveAuthorized]')
+    this.setState('authorized')
+
+    // TODO checkMessage
+
+    const userAppDbId = json.userAppDbId
+
+    // Check if the User-app is already registered
+    if (await common.utils.dbExists(userAppDbId)) {
+      await this._dbExists(json)
+    } else {
+      await this._dbUnknown()
+    }
+  }
+
+  async _dbExists (json) {
+    debug('[masq._dbExists]')
+
+    // TODO checkMessage
+
+    // Store the session info and read into this state
+    this._storeSessionInfo(this.stayConnected, json)
+
+    this.userAppDb = common.utils.createPromisifiedHyperDB(this.userAppDbId)
+    await common.utils.dbReady(this.userAppDb)
+
+    const encryptedMsg = await common.crypto.encrypt(
+      this.loginKey,
+      { msg: 'connectionEstablished' },
+      'base64'
     )
+    this.loginPeer.send(JSON.stringify(encryptedMsg))
 
-    return new Promise((resolve, reject) => {
-      if (this._logIntoMasqDone) {
-        this._logIntoMasqDone = false
-        if (this._logIntoMasqErr) {
-          return reject(this._logIntoMasqErr)
-        } else {
-          this.eventTarget.dispatchEvent(new Event('logged_in'))
-          return resolve()
+    this.setState('logged')
+
+    // TODO make sure try/catch is not needed
+    this.startReplication()
+  }
+
+  async _storeSessionInfo (stayConnected, userInfoJson) {
+    const { userAppDbId, userAppDEK, userAppNonce, username, profileImage } = userInfoJson
+    this.username = username
+    this.profileImage = profileImage
+
+    this.userAppDbId = userAppDbId
+    this.userAppDEK = userAppDEK
+
+    if (userAppDEK) {
+      // store the dataEncryptionKey as a CryptoKey
+      this.importedUserAppDEK = await common.crypto.importKey(Buffer.from(userAppDEK, 'hex'))
+    }
+
+    this.userAppNonce = userAppNonce
+
+    // Store the session info
+    const currentUserInfo = {
+      userAppDbId: this.userAppDbId,
+      userAppDEK: userAppDEK,
+      username: this.username,
+      profileImage: this.profileImage,
+      userAppNonce: this.userAppNonce
+    }
+
+    if (stayConnected) {
+      window.localStorage.setItem(CURRENT_USER_INFO_STR, JSON.stringify(currentUserInfo))
+    }
+    window.sessionStorage.setItem(CURRENT_USER_INFO_STR, JSON.stringify(currentUserInfo))
+  }
+
+  _deleteSessionInfo () {
+    window.localStorage.removeItem(CURRENT_USER_INFO_STR)
+    window.sessionStorage.removeItem(CURRENT_USER_INFO_STR)
+  }
+
+  async _dbUnknown () {
+    debug('[masq._dbUnknown]')
+    await this._registerNeeded()
+  }
+
+  async _receiveNotAuthorized () {
+    debug('[masq._receiveNotAuthorized]')
+    await this._registerNeeded()
+  }
+
+  async _registerNeeded () {
+    debug('[masq._registerNeeded]')
+    this.setState('registerNeeded')
+
+    const msg = {
+      msg: 'registerUserApp',
+      name: this.appName,
+      description: this.appDescription,
+      imageURL: this.appImageURL
+    }
+    let encryptedMsg = await common.crypto.encrypt(this.loginKey, msg, 'base64')
+    this.loginPeer.send(JSON.stringify(encryptedMsg))
+
+    const pr = new Promise((resolve, reject) => {
+      this.loginPeer.once('data', async (data) => {
+        try {
+          // decrypt the received message and check if the right key has been used
+          const json = await common.crypto.decrypt(this.loginKey, JSON.parse(data), 'base64')
+          // this._checkMessage(json, registering, waitingForWriteAccess)
+
+          switch (json.msg) {
+            case 'masqAccessGranted':
+              await this._registering(json)
+              break
+
+            case 'masqAccessRefused':
+              await this._userRefusedAccess()
+              break
+
+            default:
+              throw new MasqError(MasqError.WRONG_MESSAGE, `Unexpectedly received message with type ${json.code}`)
+          }
+        } catch (err) {
+          await this._resetLogin('could not decrypt')
+          reject(err)
         }
-      }
-      this._onLogIntoMasqDone = () => {
-        this._onLogIntoMasqDone = undefined
-        this._logIntoMasqDone = false
-        if (this._logIntoMasqErr) {
-          return reject(this._logIntoMasqErr)
-        } else {
-          this.eventTarget.dispatchEvent(new Event('logged_in'))
-          return resolve()
-        }
-      }
+        resolve()
+      })
     })
+
+    await pr
   }
 
-  //
-  // Database Access Functions
-  //
-
-  _getDB () {
-    if (!this.userAppDb) throw new MasqError(MasqError.NOT_CONNECTED)
-    return this.userAppDb
+  async _userRefusedAccess () {
+    debug('[masq._userRefusedAccess]')
+    await this._resetLogin()
+    throw new MasqError(MasqError.MASQ_ACCESS_REFUSED_BY_USER)
   }
 
-  /**
-   * Set a watcher
-   * @param {string} key - Key
-   * @returns {Object}
-   */
+  async _registering (json) {
+    debug('[masq._registering]')
+    this.setState('accessMaterialReceived')
+
+    // TODO checkMessage
+
+    // Store the session info and read into this state
+    this._storeSessionInfo(this.stayConnected, json)
+
+    const buffKey = Buffer.from(json.key, 'hex')
+    const db = common.utils.createPromisifiedHyperDB(json.userAppDbId, buffKey)
+    await common.utils.dbReady(db)
+
+    const msg = {
+      msg: 'requestWriteAccess',
+      key: db.local.key.toString('hex')
+    }
+    const encryptedMsg = await common.crypto.encrypt(this.loginKey, msg, 'base64')
+    this.loginPeer.send(JSON.stringify(encryptedMsg))
+
+    const pr = new Promise((resolve, reject) => {
+      this.loginPeer.once('data', async (data) => {
+        try {
+          // decrypt the received message and check if the right key has been used
+          const json = await common.crypto.decrypt(this.loginKey, JSON.parse(data), 'base64')
+          // this._checkMessage(json, registering, waitingForWriteAccess)
+
+          switch (json.msg) {
+            case 'writeAccessGranted':
+              await this._dbCreation()
+              break
+
+            default:
+              throw new MasqError(MasqError.WRONG_MESSAGE, `Unexpectedly received message with type ${json.code}`)
+          }
+        } catch (err) {
+          await this._resetLogin('could not decrypt')
+          reject(err)
+        }
+        resolve()
+      })
+    })
+
+    await pr
+  }
+
+  async _dbCreation () {
+    debug('[masq._dbCreation]')
+    this.setState('userAppDbCreated')
+
+    await this._openDb()
+
+    const msg = {
+      msg: 'connectionEstablished'
+    }
+    const encryptedMsg = await common.crypto.encrypt(this.loginKey, msg, 'base64')
+
+    this.loginPeer.send(JSON.stringify(encryptedMsg))
+
+    await this._awaitReadyMsg()
+  }
+
+  async _awaitReadyMsg () {
+    debug('[masq._awaitReadyMsg]')
+    // TODO : should we really await a 'ready' message when register ?
+    this.setState('logged')
+    this.startReplication()
+  }
+
+  async signout () {
+    this.userAppDbId = null
+    this.userAppDb = null
+
+    await this._resetLogin()
+
+    debug('[masq.signout] dispatched event: signed_out')
+    this.eventTarget.dispatchEvent(new Event('signed_out'))
+  }
+
   async watch (key, cb) {
-    const db = this._getDB()
-    await common.utils.watch(db, this.nonce, key, cb)
+    debug('[masq.watch] logged : ' + this.isLoggedIn())
+    if (!this.isLoggedIn()) {
+      throw new MasqError(MasqError.NOT_CONNECTED)
+    }
+    return common.utils.watch(this.userAppDb, this.userAppNonce, key, cb)
   }
 
-  /**
-   * Get a value
-   * @param {string} key - Key
-   * @returns {Promise}
-   */
   async get (key) {
-    const db = this._getDB()
-    const dec = await common.utils.get(db, this.dataEncryptionKey, this.nonce, key)
-    return dec
+    if (!this.isLoggedIn()) {
+      throw new MasqError(MasqError.NOT_CONNECTED)
+    }
+    return common.utils.get(this.userAppDb, this.importedUserAppDEK, this.userAppNonce, key)
   }
 
-  /**
-   * Put a new value in the current profile database
-   * @param {string} key - Key
-   * @param {string} value - The value to insert
-   * @returns {Promise}
-   */
   async put (key, value) {
-    const db = this._getDB()
-    return common.utils.put(db, this.dataEncryptionKey, this.nonce, key, value)
+    if (!this.isLoggedIn()) {
+      throw new MasqError(MasqError.NOT_CONNECTED)
+    }
+    return common.utils.put(this.userAppDb, this.importedUserAppDEK, this.userAppNonce, key, value)
   }
 
-  /**
-   * Delete a key
-   * @param {string} key - Key
-   * @returns {Promise}
-   */
   async del (key) {
-    const db = this._getDB()
-    const hashedKey = await common.utils.hashKey(key, this.nonce)
-    return db.delAsync(hashedKey)
+    if (!this.isLoggedIn()) {
+      throw new MasqError(MasqError.NOT_CONNECTED)
+    }
+    const hashedKey = await common.utils.hashKey(key, this.userAppNonce)
+    return this.userAppDb.delAsync(hashedKey)
   }
 
-  /**
-   * List all keys and values
-   * @param {string} prefix - Prefix
-   * @returns {Promise}
-   */
   async list (prefix) {
-    const db = this._getDB()
-    const list = await common.utils.list(db, this.dataEncryptionKey, this.nonce, prefix)
-    return list
+    if (!this.isLoggedIn()) {
+      throw new MasqError(MasqError.NOT_CONNECTED)
+    }
+    return common.utils.list(this.userAppDb, this.importedUserAppDEK, this.userAppNonce, prefix)
   }
 }
 
