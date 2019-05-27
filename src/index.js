@@ -194,6 +194,10 @@ class Masq {
     }
     const discoveryKey = this.userAppDb.discoveryKey.toString('hex')
     this.userAppRepHub = signalhub(discoveryKey, this.config.hubUrls)
+    this.userAppRepHub.on('error', () => {
+      debug('[masq.startReplication] dispatched event: replicationError')
+      this.eventTarget.dispatchEvent(new CustomEvent('replicationError', { detail: new MasqError(MasqError.REPLICATION_SIGNALLING_ERROR) }))
+    })
     this.userAppRepSW = this._createSwarm(this.userAppRepHub)
 
     this.setState('replicating')
