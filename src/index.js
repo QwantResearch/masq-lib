@@ -312,7 +312,7 @@ class Masq {
 
               default:
                 // TODO change error
-                throw new MasqError(MasqError.WRONG_MESSAGE, `Unexpectedly received message with type ${json.code}`)
+                throw new MasqError(MasqError.WRONG_MESSAGE, `Unexpectedly received message with type ${json.msg}`)
             }
             resolve()
           } catch (e) {
@@ -492,7 +492,7 @@ class Masq {
               break
 
             default:
-              throw new MasqError(MasqError.WRONG_MESSAGE, `Unexpectedly received message with type ${json.code}`)
+              throw new MasqError(MasqError.WRONG_MESSAGE, `Unexpectedly received message with type ${json.msg}`)
           }
         } catch (err) {
           await this._resetLogin('could not decrypt')
@@ -544,7 +544,7 @@ class Masq {
               break
 
             default:
-              throw new MasqError(MasqError.WRONG_MESSAGE, `Unexpectedly received message with type ${json.code}`)
+              throw new MasqError(MasqError.WRONG_MESSAGE, `Unexpectedly received message with type ${json.msg}`)
           }
         } catch (err) {
           await this._resetLogin('could not decrypt')
