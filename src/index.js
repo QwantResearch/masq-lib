@@ -114,12 +114,20 @@ class Masq {
       if (e.key === CURRENT_USER_INFO_STR) {
         if (e.newValue === null) {
           if (this.isLoggedIn()) {
+            debug('[masq._listenForLoginOrSignout] detected signout from another window/tab')
             await this.signout()
           }
         } else if (e.newValue) {
-          await this._loadSessionInfo()
-          debug('[masq._listenForLoginOrSignout] dispatch logged_in')
-          this.eventTarget.dispatchEvent(new Event('logged_in'))
+          // if we are logging in in the current tab
+          if (this.state !== 'authorized' &&
+              this.state !== 'accessMaterialReceived' &&
+              this.state !== 'logged' &&
+              this.state !== 'replicating') {
+            await this._loadSessionInfo()
+            debug('[masq._listenForLoginOrSignout] detected login from another window/tab')
+            debug('[masq._listenForLoginOrSignout] dispatch logged_in')
+            this.eventTarget.dispatchEvent(new Event('logged_in'))
+          }
         }
       }
     })
@@ -344,6 +352,7 @@ class Masq {
   }
 
   async _resetLogin () {
+    debug('[masq._resetLogin]')
     this._deleteSessionInfo()
 
     // clear state
