@@ -34,7 +34,7 @@ class Masq {
     }
 
     // init state
-    this.setState('notLogged')
+    this.state = 'notLogged'
 
     // init state through async function
     // this.init should be awaited to make sure state is initialized
@@ -57,7 +57,7 @@ class Masq {
     this._listenForFocus()
   }
 
-  setState (newState) {
+  async setState (newState) {
     const currState = this.state
     switch (newState) {
       case 'notLogged':
@@ -145,7 +145,7 @@ class Masq {
       this.userAppDEK = userAppDEK
       this.importedUserAppDEK = await common.crypto.importKey(Buffer.from(userAppDEK, 'hex'))
       this.userAppNonce = userAppNonce
-      this.setState('logged')
+      await this.setState('logged')
       await this._openDb()
       this.startReplication()
     }
@@ -272,7 +272,7 @@ class Masq {
   }
 
   async logIntoMasq (stayConnected) {
-    this.setState('loggingIn')
+    await this.setState('loggingIn')
 
     // make stayConnected i boolean
     this.stayConnected = !!stayConnected
@@ -376,12 +376,12 @@ class Masq {
 
     await this._genLoginLink()
 
-    this.setState('notLogged')
+    await this.setState('notLogged')
   }
 
   async _receivedAuthorized (json) {
     debug('[masq._receiveAuthorized]')
-    this.setState('authorized')
+    await this.setState('authorized')
 
     // TODO checkMessage
 
@@ -413,7 +413,7 @@ class Masq {
     )
     this.loginPeer.send(JSON.stringify(encryptedMsg))
 
-    this.setState('logged')
+    await this.setState('logged')
 
     // TODO make sure try/catch is not needed
     this.startReplication()
@@ -466,7 +466,7 @@ class Masq {
 
   async _registerNeeded () {
     debug('[masq._registerNeeded]')
-    this.setState('registerNeeded')
+    await this.setState('registerNeeded')
 
     const msg = {
       msg: 'registerUserApp',
@@ -515,7 +515,7 @@ class Masq {
 
   async _registering (json) {
     debug('[masq._registering]')
-    this.setState('accessMaterialReceived')
+    await this.setState('accessMaterialReceived')
 
     // TODO checkMessage
 
@@ -561,7 +561,7 @@ class Masq {
 
   async _dbCreation () {
     debug('[masq._dbCreation]')
-    this.setState('userAppDbCreated')
+    await this.setState('userAppDbCreated')
 
     await this._openDb()
 
@@ -578,7 +578,7 @@ class Masq {
   async _awaitReadyMsg () {
     debug('[masq._awaitReadyMsg]')
     // TODO : should we really await a 'ready' message when register ?
-    this.setState('logged')
+    await this.setState('logged')
     this.startReplication()
   }
 
