@@ -36,10 +36,6 @@ class Masq {
     // init state
     this.state = 'notLogged'
 
-    // init state through async function
-    // this.init should be awaited to make sure state is initialized
-    this.initPromise = this._init()
-
     // login state data
     this.stayConnected = false
     this.loginChannel = null
@@ -55,6 +51,10 @@ class Masq {
     // setup listeners
     this._listenForLoginOrSignout()
     this._listenForFocus()
+
+    // init state through async function
+    // this.init should be awaited to make sure state is initialized
+    this.initPromise = this._init()
   }
 
   async setState (newState) {
@@ -80,6 +80,7 @@ class Masq {
             MasqError.INVALID_STATE_TRANSITION,
             'state transition invalid: ' + currState + ' -> ' + newState)
         }
+        this._storeSessionInfo()
         debug('[masq.setState] dispatched event: logged_in')
         this.eventTarget.dispatchEvent(new Event('logged_in'))
         break
@@ -400,10 +401,7 @@ class Masq {
 
     // TODO checkMessage
 
-    // Store the session info and read into this state
-    this._storeSessionInfo(this.stayConnected, json)
-
-    this.userAppDb = common.utils.createPromisifiedHyperDB(this.userAppDbId)
+    this.userAppDb = common.utils.createPromisifiedHyperDB(json.userAppDbId)
     await common.utils.dbReady(this.userAppDb)
 
     const encryptedMsg = await common.crypto.encrypt(
@@ -415,11 +413,14 @@ class Masq {
 
     await this.setState('logged')
 
+    // Read session info into this state
+    this._readSessionInfoIntoState(json)
+
     // TODO make sure try/catch is not needed
     this.startReplication()
   }
 
-  async _storeSessionInfo (stayConnected, userInfoJson) {
+  async _readSessionInfoIntoState (userInfoJson) {
     const { userAppDbId, userAppDEK, userAppNonce, username, profileImage } = userInfoJson
     this.username = username
     this.profileImage = profileImage
@@ -433,17 +434,19 @@ class Masq {
     }
 
     this.userAppNonce = userAppNonce
+  }
 
+  _storeSessionInfo () {
     // Store the session info
     const currentUserInfo = {
       userAppDbId: this.userAppDbId,
-      userAppDEK: userAppDEK,
+      userAppDEK: this.userAppDEK,
       username: this.username,
       profileImage: this.profileImage,
       userAppNonce: this.userAppNonce
     }
 
-    if (stayConnected) {
+    if (this.stayConnected) {
       window.localStorage.setItem(CURRENT_USER_INFO_STR, JSON.stringify(currentUserInfo))
     }
     window.sessionStorage.setItem(CURRENT_USER_INFO_STR, JSON.stringify(currentUserInfo))
@@ -519,8 +522,8 @@ class Masq {
 
     // TODO checkMessage
 
-    // Store the session info and read into this state
-    this._storeSessionInfo(this.stayConnected, json)
+    // Read session info into this state
+    this._readSessionInfoIntoState(json)
 
     const buffKey = Buffer.from(json.key, 'hex')
     const db = common.utils.createPromisifiedHyperDB(json.userAppDbId, buffKey)
@@ -579,6 +582,7 @@ class Masq {
     debug('[masq._awaitReadyMsg]')
     // TODO : should we really await a 'ready' message when register ?
     await this.setState('logged')
+
     this.startReplication()
   }
 
