@@ -48,6 +48,7 @@ class Masq {
     this.loginPeer = null
 
     // reset replication variables
+    this.isReplicating = false
     this.userAppRepSW = null
     this.userAppRepHub = null
 
@@ -74,19 +75,13 @@ class Masq {
       case 'logged':
         if (currState !== 'notLogged' &&
             currState !== 'authorized' &&
-            currState !== 'userAppDbCreated' &&
-            currState !== 'replicating') {
+            currState !== 'userAppDbCreated') {
           throw new MasqError(
             MasqError.INVALID_STATE_TRANSITION,
             'state transition invalid: ' + currState + ' -> ' + newState)
         }
-        // dispatch event logged_in if the transition is not from replicating
-        if (currState !== 'replicating') {
-          debug('[masq.setState] dispatched event: logged_in')
-          this.eventTarget.dispatchEvent(new Event('logged_in'))
-        }
-        break
-      case 'replicating':
+        debug('[masq.setState] dispatched event: logged_in')
+        this.eventTarget.dispatchEvent(new Event('logged_in'))
         break
       default:
         throw new MasqError()
@@ -121,8 +116,7 @@ class Masq {
           // if we are logging in in the current tab
           if (this.state !== 'authorized' &&
               this.state !== 'accessMaterialReceived' &&
-              this.state !== 'logged' &&
-              this.state !== 'replicating') {
+              this.state !== 'logged') {
             await this._loadSessionInfo()
             debug('[masq._listenForLoginOrSignout] detected login from another window/tab')
             debug('[masq._listenForLoginOrSignout] dispatch logged_in')
@@ -208,7 +202,6 @@ class Masq {
     })
     this.userAppRepSW = this._createSwarm(this.userAppRepHub)
 
-    this.setState('replicating')
     this.userAppRepSW.on('peer', (peer, id) => {
       try {
         const stream = this.userAppDb.replicate({ live: true })
@@ -219,6 +212,8 @@ class Masq {
         }
       }
     })
+
+    this.isReplicating = true
   }
 
   async stopReplication () {
@@ -236,17 +231,15 @@ class Masq {
     this.userAppRepSW = null
     this.userAppRepHub = null
 
-    if (this.state === 'replicating') {
-      this.setState('logged')
-    }
+    this.isReplicating = false
   }
 
   isReplicating () {
-    return (this.state === 'replicating')
+    return this.isReplicating
   }
 
   isLoggedIn () {
-    return (this.state === 'logged' || this.state === 'replicating')
+    return (this.state === 'logged')
   }
 
   async getUsername () {
