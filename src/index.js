@@ -127,6 +127,7 @@ class Masq {
   }
 
   async _init () {
+    debug('[masq._init]')
     // try to login from session info
     await this._loadSessionInfo()
 
@@ -165,12 +166,14 @@ class Masq {
       if (!this.isLoggedIn()) {
         return
       }
+      debug('[masq._listenForFocus] detected refocus on window')
       await this._openDb()
       this.startReplication()
     })
   }
 
   async _loadSessionInfo () {
+    debug('[masq._loadSessionInfo]')
     const auxLoginFromUserInfo = async (currentUserInfo) => {
       const { userAppDbId, userAppDEK, userAppNonce } = JSON.parse(currentUserInfo)
       this.userAppDbId = userAppDbId
