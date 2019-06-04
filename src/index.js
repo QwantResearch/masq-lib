@@ -44,7 +44,7 @@ class Masq {
     this.loginPeer = null
 
     // reset replication variables
-    this.isReplicating = false
+    this.replicating = false
     this.userAppRepSW = null
     this.userAppRepHub = null
 
@@ -244,7 +244,7 @@ class Masq {
       }
     })
 
-    this.isReplicating = true
+    this.replicating = true
   }
 
   async stopReplication () {
@@ -262,11 +262,11 @@ class Masq {
     this.userAppRepSW = null
     this.userAppRepHub = null
 
-    this.isReplicating = false
+    this.replicating = false
   }
 
   isReplicating () {
-    return this.isReplicating
+    return this.replicating
   }
 
   isLoggedIn () {
