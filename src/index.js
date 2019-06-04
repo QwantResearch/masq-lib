@@ -59,6 +59,8 @@ class Masq {
 
   async setState (newState) {
     const currState = this.state
+
+    // BEFORE
     switch (newState) {
       case 'notLogged':
         break
@@ -81,14 +83,43 @@ class Masq {
             'state transition invalid: ' + currState + ' -> ' + newState)
         }
         this._storeSessionInfo()
-        debug('[masq.setState] dispatched event: logged_in')
-        this.eventTarget.dispatchEvent(new Event('logged_in'))
         break
       default:
         throw new MasqError()
     }
+
+    // TRANSITION
     debug('[masq.setState] changing state : ' + currState + ' -> ' + newState)
     this.state = newState
+
+    // AFTER
+    switch (newState) {
+      case 'notLogged':
+        break
+      case 'userAppDbCreated':
+        break
+      case 'accessMaterialReceived':
+        break
+      case 'registerNeeded':
+        break
+      case 'authorized':
+        break
+      case 'loggingIn':
+        break
+      case 'logged':
+        debug('[masq.setState] dispatched event: logged_in')
+        this.eventTarget.dispatchEvent(new Event('logged_in'))
+
+        // TODO make sure try/catch is not needed
+        try {
+          this.startReplication()
+        } catch (e) {
+          console.error('startRep error : ' + e)
+        }
+        break
+      default:
+        throw new MasqError()
+    }
   }
 
   async init () {
@@ -146,9 +177,8 @@ class Masq {
       this.userAppDEK = userAppDEK
       this.importedUserAppDEK = await common.crypto.importKey(Buffer.from(userAppDEK, 'hex'))
       this.userAppNonce = userAppNonce
-      await this.setState('logged')
       await this._openDb()
-      this.startReplication()
+      await this.setState('logged')
     }
 
     // If user info is stored in session storage, do not use localStorage
@@ -411,13 +441,10 @@ class Masq {
     )
     this.loginPeer.send(JSON.stringify(encryptedMsg))
 
-    await this.setState('logged')
-
     // Read session info into this state
     this._readSessionInfoIntoState(json)
 
-    // TODO make sure try/catch is not needed
-    this.startReplication()
+    await this.setState('logged')
   }
 
   async _readSessionInfoIntoState (userInfoJson) {
@@ -581,9 +608,8 @@ class Masq {
   async _awaitReadyMsg () {
     debug('[masq._awaitReadyMsg]')
     // TODO : should we really await a 'ready' message when register ?
-    await this.setState('logged')
 
-    this.startReplication()
+    await this.setState('logged')
   }
 
   async signout () {
