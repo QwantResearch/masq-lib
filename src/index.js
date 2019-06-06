@@ -175,11 +175,13 @@ class Masq {
   async _loadSessionInfo () {
     debug('[masq._loadSessionInfo]')
     const auxLoginFromUserInfo = async (currentUserInfo) => {
-      const { userAppDbId, userAppDEK, userAppNonce } = JSON.parse(currentUserInfo)
+      const { userAppDbId, userAppDEK, userAppNonce, username, profileImage } = JSON.parse(currentUserInfo)
       this.userAppDbId = userAppDbId
       this.userAppDEK = userAppDEK
       this.importedUserAppDEK = await common.crypto.importKey(Buffer.from(userAppDEK, 'hex'))
       this.userAppNonce = userAppNonce
+      this.username = username
+      this.profileImage = profileImage
       await this._openDb()
       await this.setState('logged')
     }
