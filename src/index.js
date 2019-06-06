@@ -448,7 +448,7 @@ class Masq {
     this.loginPeer.send(JSON.stringify(encryptedMsg))
 
     // Read session info into this state
-    this._readSessionInfoIntoState(json)
+    await this._readSessionInfoIntoState(json)
 
     await this.setState('logged')
   }
