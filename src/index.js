@@ -325,14 +325,11 @@ class Masq {
 
       this.loginSw = this._createSwarm(hub)
 
-      let dataReceived = false
-
       this.loginSw.on('peer', (peer, id) => {
         debug(`The peer ${id} join us...`)
         this.loginPeer = peer
 
         this.loginPeer.once('data', async (data) => {
-          dataReceived = true
           try {
             // decrypt the received message and check if the right key has been used
             const json = await common.crypto.decrypt(this.loginKey, JSON.parse(data), 'base64')
@@ -359,12 +356,11 @@ class Masq {
           }
         })
 
-        this.loginSw.on('disconnect', async (peer, id) => {
+        this.loginSwDisconnectListener = async (peer, id) => {
           debug('[masq.logIntoMasq] disconnect')
-          if (!dataReceived) {
-            reject(new MasqError(MasqError.DISCONNECTED_DURING_LOGIN))
-          }
-        })
+          reject(new MasqError(MasqError.DISCONNECTED_DURING_LOGIN))
+        }
+        this.loginSw.on('disconnect', this.loginSwDisconnectListener)
 
         this.loginSw.on('close', () => {
           debug('[masq.logIntoMasq] close')
@@ -390,7 +386,13 @@ class Masq {
     this.loginChannel = null
     this.loginKey = null
     this.loginUrl = null
+
     if (this.loginSw) {
+      // remove disconnect listener
+      if (this.loginSwDisconnectListener) {
+        this.loginSw.removeListener('disconnect', this.loginSwDisconnectListener)
+      }
+
       if (!this.loginSw.closed) {
         await new Promise((resolve) => {
           this.loginSw.close(() => {
