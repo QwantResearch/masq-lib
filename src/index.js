@@ -252,10 +252,10 @@ class Masq {
 
   async stopReplication () {
     debug('[masq.stopReplication]')
+    if (!this.userAppRepSW) {
+      return
+    }
     await new Promise((resolve) => {
-      if (!this.userAppRepSW) {
-        resolve()
-      }
       this.userAppRepSW.close(() => {
         resolve()
       })
