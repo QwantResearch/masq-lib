@@ -424,7 +424,8 @@ class Masq {
     const userAppDbId = json.userAppDbId
 
     // Check if the User-app is already registered
-    if (await common.utils.dbExists(userAppDbId)) {
+    const dbAlreadyExists = await common.utils.dbExists(userAppDbId)
+    if (dbAlreadyExists) {
       await this._dbExists(json)
     } else {
       await this._dbUnknown()
