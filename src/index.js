@@ -168,7 +168,11 @@ class Masq {
       }
       debug('[masq._listenForFocus] detected refocus on window')
       await this._openDb()
-      this.startReplication()
+      try {
+        this.startReplication()
+      } catch (e) {
+        console.log('replication after refocus failed')
+      }
     })
   }
 
@@ -225,11 +229,8 @@ class Masq {
       return
     }
 
-    try {
-      this.userAppDb.discoveryKey.toString('hex')
-    } catch (e) {
-      console.error(e)
-    }
+    this.userAppDb.discoveryKey.toString('hex')
+
     const discoveryKey = this.userAppDb.discoveryKey.toString('hex')
     this.userAppRepHub = signalhub(discoveryKey, this.config.hubUrls)
     this.userAppRepHub.on('error', () => {
