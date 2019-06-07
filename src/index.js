@@ -333,7 +333,6 @@ class Masq {
           try {
             // decrypt the received message and check if the right key has been used
             const json = await common.crypto.decrypt(this.loginKey, JSON.parse(data), 'base64')
-            // this._checkMessage(json, registering, waitingForWriteAccess)
 
             switch (json.msg) {
               case 'authorized':
@@ -522,7 +521,6 @@ class Masq {
         try {
           // decrypt the received message and check if the right key has been used
           const json = await common.crypto.decrypt(this.loginKey, JSON.parse(data), 'base64')
-          // this._checkMessage(json, registering, waitingForWriteAccess)
 
           switch (json.msg) {
             case 'masqAccessGranted':
@@ -578,7 +576,6 @@ class Masq {
         try {
           // decrypt the received message and check if the right key has been used
           const json = await common.crypto.decrypt(this.loginKey, JSON.parse(data), 'base64')
-          // this._checkMessage(json, registering, waitingForWriteAccess)
 
           switch (json.msg) {
             case 'writeAccessGranted':
