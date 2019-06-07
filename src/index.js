@@ -391,6 +391,7 @@ class Masq {
       // remove disconnect listener
       if (this.loginSwDisconnectListener) {
         this.loginSw.removeListener('disconnect', this.loginSwDisconnectListener)
+        this.loginSwDisconnectListener = null
       }
 
       if (!this.loginSw.closed) {
