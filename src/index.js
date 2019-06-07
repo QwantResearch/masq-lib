@@ -536,7 +536,7 @@ class Masq {
               throw new MasqError(MasqError.WRONG_MESSAGE, `Unexpectedly received message with type ${json.msg}`)
           }
         } catch (err) {
-          await this._resetLogin('could not decrypt')
+          await this._resetLogin()
           reject(err)
         }
         resolve()
@@ -588,7 +588,7 @@ class Masq {
               throw new MasqError(MasqError.WRONG_MESSAGE, `Unexpectedly received message with type ${json.msg}`)
           }
         } catch (err) {
-          await this._resetLogin('could not decrypt')
+          await this._resetLogin()
           reject(err)
         }
         resolve()
