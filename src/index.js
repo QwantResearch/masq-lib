@@ -561,12 +561,12 @@ class Masq {
     this._readSessionInfoIntoState(json)
 
     const buffKey = Buffer.from(json.key, 'hex')
-    const db = common.utils.createPromisifiedHyperDB(json.userAppDbId, buffKey)
-    await common.utils.dbReady(db)
+    this.userAppDb = common.utils.createPromisifiedHyperDB(json.userAppDbId, buffKey)
+    await common.utils.dbReady(this.userAppDb)
 
     const msg = {
       msg: 'requestWriteAccess',
-      key: db.local.key.toString('hex')
+      key: this.userAppDb.local.key.toString('hex')
     }
     const encryptedMsg = await common.crypto.encrypt(this.loginKey, msg, 'base64')
     this.loginPeer.send(JSON.stringify(encryptedMsg))
@@ -599,8 +599,6 @@ class Masq {
   async _dbCreation () {
     debug('[masq._dbCreation]')
     await this.setState('userAppDbCreated')
-
-    await this._openDb()
 
     const msg = {
       msg: 'connectionEstablished'
