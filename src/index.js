@@ -36,6 +36,18 @@ class Masq {
     // init state
     this.state = 'notLogged'
 
+    this.initNullAttributes()
+
+    // setup listeners
+    this._listenForLoginOrSignout()
+    this._listenForFocus()
+
+    // init state through async function
+    // this.init should be awaited to make sure state is initialized
+    this.initPromise = this._init()
+  }
+
+  initNullAttributes () {
     // login state data
     this.stayConnected = false
     this.loginChannel = null
@@ -48,13 +60,29 @@ class Masq {
     this.userAppRepSW = null
     this.userAppRepHub = null
 
-    // setup listeners
-    this._listenForLoginOrSignout()
-    this._listenForFocus()
+    // reset logged in user variable
+    this.userAppDbId = null
+    this.userAppDb = null
+    this.userAppDEK = null
+    this.importedUserAppDEK = null
+    this.userAppNonce = null
+    this.username = null
+    this.profileImage = null
+  }
 
-    // init state through async function
-    // this.init should be awaited to make sure state is initialized
-    this.initPromise = this._init()
+  async init () {
+    await this.initPromise
+  }
+
+  async _init () {
+    debug('[masq._init]')
+    // try to login from session info
+    await this._loadSessionInfo()
+
+    // get login channel and key created at login link generation
+    // sets this.loginKey and this.loginChannel
+    // TODO check login link lifecycle
+    await this._genLoginLink()
   }
 
   async setState (newState) {
@@ -120,21 +148,6 @@ class Masq {
       default:
         throw new MasqError()
     }
-  }
-
-  async init () {
-    await this.initPromise
-  }
-
-  async _init () {
-    debug('[masq._init]')
-    // try to login from session info
-    await this._loadSessionInfo()
-
-    // get login channel and key created at login link generation
-    // sets this.loginKey and this.loginChannel
-    // TODO check login link lifecycle
-    await this._genLoginLink()
   }
 
   _listenForLoginOrSignout () {
@@ -296,12 +309,12 @@ class Masq {
     this.loginKey = await common.crypto.genAESKey(true, 'AES-GCM', 128)
     const extractedKey = await common.crypto.exportKey(this.loginKey)
     const keyBase64 = Buffer.from(extractedKey).toString('base64')
-    this.loginUrl = new URL(this.config.masqAppBaseUrl)
+    const loginUrl = new URL(this.config.masqAppBaseUrl)
     const requestType = 'login'
     const hashParams = JSON.stringify([this.appName, requestType, this.loginChannel, keyBase64])
-    this.loginUrl.hash = '/link/' + Buffer.from(hashParams).toString('base64')
+    loginUrl.hash = '/link/' + Buffer.from(hashParams).toString('base64')
 
-    this.loginLink = this.loginUrl.href
+    this.loginLink = loginUrl.href
   }
 
   async getLoginLink () {
@@ -380,12 +393,8 @@ class Masq {
     debug('[masq._resetLogin]')
     this._deleteSessionInfo()
 
-    // clear state
-    this.stayConnected = false
-    this.loginChannel = null
-    this.loginKey = null
-    this.loginUrl = null
-
+    // remove disconnect listener
+    // close login swarm
     if (this.loginSw) {
       // remove disconnect listener
       if (this.loginSwDisconnectListener) {
@@ -401,17 +410,11 @@ class Masq {
         })
       }
     }
-    this.loginSw = null
-    this.loginPeer = null
-    this.username = null
-    this.profileImage = null
-    this.userAppDbId = null
-    this.userAppDEK = null
-    this.importedUserAppDEK = null
-    this.userAppNonce = null
-    this.userAppDb = null
 
     await this.stopReplication()
+
+    // nullify attributes
+    this.initNullAttributes()
 
     await this._genLoginLink()
 
