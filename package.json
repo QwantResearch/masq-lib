@@ -2,6 +2,7 @@
   "name": "masq-lib",
   "version": "0.0.0",
   "description": "",
+  "license": "LGPL-3.0",
   "main": "dist/masq.js",
   "module": "src/index.js",
   "scripts": {
