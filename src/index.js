@@ -111,6 +111,7 @@ class Masq {
             'state transition invalid: ' + currState + ' -> ' + newState)
         }
         this._storeSessionInfo()
+
         break
       default:
         throw new MasqError()
@@ -125,6 +126,7 @@ class Masq {
       case 'notLogged':
         break
       case 'userAppDbCreated':
+        this._removeDisconnectListener()
         break
       case 'accessMaterialReceived':
         break
@@ -135,6 +137,8 @@ class Masq {
       case 'loggingIn':
         break
       case 'logged':
+        this._removeDisconnectListener()
+
         debug('[masq.setState] dispatched event: logged_in')
         this.eventTarget.dispatchEvent(new Event('logged_in'))
 
@@ -389,6 +393,16 @@ class Masq {
     }
   }
 
+  _removeDisconnectListener () {
+    if (this.loginSw) {
+      // remove disconnect listener
+      if (this.loginSwDisconnectListener) {
+        this.loginSw.removeListener('disconnect', this.loginSwDisconnectListener)
+        this.loginSwDisconnectListener = null
+      }
+    }
+  }
+
   async _resetLogin () {
     debug('[masq._resetLogin]')
     this._deleteSessionInfo()
@@ -396,11 +410,7 @@ class Masq {
     // remove disconnect listener
     // close login swarm
     if (this.loginSw) {
-      // remove disconnect listener
-      if (this.loginSwDisconnectListener) {
-        this.loginSw.removeListener('disconnect', this.loginSwDisconnectListener)
-        this.loginSwDisconnectListener = null
-      }
+      this._removeDisconnectListener()
 
       if (!this.loginSw.closed) {
         await new Promise((resolve) => {
