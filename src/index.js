@@ -50,8 +50,6 @@ class Masq {
   initNullAttributes () {
     // login state data
     this.stayConnected = false
-    this.loginChannel = null
-    this.loginKey = null
     this.loginSw = null
     this.loginPeer = null
 
@@ -101,6 +99,7 @@ class Masq {
       case 'authorized':
         break
       case 'loggingIn':
+        await this._resetLogin(true)
         break
       case 'logged':
         if (currState !== 'notLogged' &&
@@ -403,8 +402,8 @@ class Masq {
     }
   }
 
-  async _resetLogin () {
-    debug('[masq._resetLogin]')
+  async _resetLogin (keepLoginLink = false) {
+    debug('[masq._resetLogin] keep login link: ' + Boolean(keepLoginLink))
     this._deleteSessionInfo()
 
     // remove disconnect listener
@@ -426,7 +425,9 @@ class Masq {
     // nullify attributes
     this.initNullAttributes()
 
-    await this._genLoginLink()
+    if (!keepLoginLink) {
+      await this._genLoginLink()
+    }
 
     await this.setState('notLogged')
   }
