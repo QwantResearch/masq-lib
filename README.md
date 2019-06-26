@@ -1,26 +1,35 @@
 # masq-lib
 
+[![Build Status](https://travis-ci.org/QwantResearch/masq-lib.svg?branch=master)](https://travis-ci.org/QwantResearch/masq-lib)
+[![JavaScript Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://standardjs.com)
+
+This project is in alpha status. The API is changing constantly, and we strongly encourage you to wait for a stable release to start using it.
+
+`masq-lib` is a JavaScript library developers can use to integrate [Masq](https://github.com/QwantResearch/masq-app) into their apps.
+
 ## Install
-```
+
+```sh
 npm install masq-lib --save
 ```
 
 ## Launch Test
-```
+
+```sh
 npm install
 npm test
 ```
 
 ## Analyze bundle size with:
-```
+
+```sh
 npm run stats
 npm run analyze
 ```
 
-
 ## Usage
 
-``` js
+```js
 const Masq = require('masq-lib')
 
 const masq = new Masq(
@@ -56,7 +65,6 @@ Create a new instance of Masq.
 
 `appLogoURL` is a link to a logo of the app.
 
-
 #### `masq.isLoggedIn() : boolean`
 
 Returns a boolean, true if a User is already logged into Masq, false if not.
@@ -78,7 +86,7 @@ The data will then be synced between the different connected devices of the User
 Signs out of Masq from Masq.
 This also means the User-app data on the device will stop being synced.
 
-### `masq.getLoginLink() -> Promise<link: string>`
+#### `masq.getLoginLink() -> Promise<link: string>`
 
 The function returns a Promise resolving to an Url which must be opened by the user in order to connect to Masq.
 
