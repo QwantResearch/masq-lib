@@ -308,6 +308,7 @@ class Masq {
   }
 
   async _genLoginLink () {
+    console.log('----------------- [masq._genLoginLink]')
     this.loginChannel = uuidv4()
     this.loginKey = await common.crypto.genAESKey(true, 'AES-GCM', 128)
     const extractedKey = await common.crypto.exportKey(this.loginKey)
@@ -322,6 +323,11 @@ class Masq {
 
   async getLoginLink () {
     return this.loginLink
+  }
+
+  async cancelLogIntoMasq () {
+    debug('[masq.cancelLogIntoMasq]')
+    await this._resetLogin()
   }
 
   async logIntoMasq (stayConnected) {
@@ -341,9 +347,27 @@ class Masq {
 
       this.loginSw = this._createSwarm(hub)
 
+      let newPeerNb = 0
+      const disconnectReceived = (peerNb, reject) => {
+        const t = 5000
+        console.log('=== Disconnect received : waiting ' + t + ' ms for a new peer before rejecting')
+        setTimeout(() => {
+          if (newPeerNb > peerNb) {
+            console.log('========== New Peer conencted after the disconnected peer, NO Need For Reject')
+          } else {
+            console.log('========== REJECTING because new Peer hasn\'t connected after the disconnected peer')
+            reject(new MasqError(MasqError.DISCONNECTED_DURING_LOGIN))
+          }
+        }, t)
+      }
+      const newPeerConnected = () => {
+        newPeerNb = newPeerNb + 1
+      }
+
       this.loginSw.on('peer', (peer, id) => {
         debug(`The peer ${id} join us...`)
         this.loginPeer = peer
+        newPeerConnected()
 
         this.loginPeer.once('data', async (data) => {
           try {
@@ -373,7 +397,8 @@ class Masq {
 
         this.loginSwDisconnectListener = async (peer, id) => {
           debug('[masq.logIntoMasq] disconnect')
-          reject(new MasqError(MasqError.DISCONNECTED_DURING_LOGIN))
+          // reject(new MasqError(MasqError.DISCONNECTED_DURING_LOGIN))
+          disconnectReceived(newPeerNb, reject)
         }
         this.loginSw.on('disconnect', this.loginSwDisconnectListener)
 
@@ -393,6 +418,7 @@ class Masq {
   }
 
   _removeDisconnectListener () {
+    console.log('##### Removing disconnect listener')
     if (this.loginSw) {
       // remove disconnect listener
       if (this.loginSwDisconnectListener) {
