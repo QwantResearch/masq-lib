@@ -90,7 +90,6 @@ describe('Test data access and input', function () {
   })
 
   it('should join a channel', async () => {
-    console.log('--- START ---')
     let peersLength
 
     const waitForPeer = new Promise(async (resolve, reject) => {
@@ -107,7 +106,6 @@ describe('Test data access and input', function () {
       })
 
       sw.on('close', () => {
-        console.log('[Mock] sw.close')
         resolve()
       })
     })
@@ -115,30 +113,53 @@ describe('Test data access and input', function () {
     let err
     try {
       await Promise.all([waitForPeer, masq.logIntoMasq(false)])
-      console.log('after Promise.all')
     } catch (e) {
-      console.log('CAUGHT', e)
       err = e
     }
     expect(err.code).to.equal(MasqError.DISCONNECTED_DURING_LOGIN)
     expect(peersLength).to.equal(1)
-    console.log('--- END ---')
   })
 
   it('first login', async () => {
-    console.log('--- START TEST ---')
     const stayConnected = false
     await logInWithMasqAppMock(stayConnected)
-    console.log('---  END  TEST ---')
   })
 
   it('first login and put data', async () => {
-    console.log('--- START TEST ---')
     const stayConnected = false
     await logInWithMasqAppMock(stayConnected)
     await masq.put('/hello', 'world')
     const retrievedValue = await masq.get('/hello')
     expect(retrievedValue).to.eql('world')
-    console.log('---  END  TEST ---')
+  })
+
+  const _deleteSessionStorage = () => {
+    const CURRENT_USER_INFO_STR = 'currentUserInfo'
+    window.sessionStorage.removeItem(CURRENT_USER_INFO_STR)
+  }
+
+  it('should be able to connect with new Masq instance after logging in with stayConnected and closing (deleteSessionStorage)', async () => {
+    expect(masq.isLoggedIn()).to.be.false
+    await logInWithMasqAppMock(true)
+
+    const key = '/hello'
+    const value = { data: 'world' }
+    await masq.put(key, value)
+    const res = await masq.get(key)
+    expect(res).to.eql(value)
+    expect(masq.isLoggedIn()).to.be.true
+    await _deleteSessionStorage()
+
+    // reconnect with new Masq instance
+    const masq2 = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL, testConfig)
+    await masq2.init()
+    expect(masq2.isLoggedIn()).to.be.true
+    const key2 = '/hello2'
+    const value2 = { data: 'world2' }
+    await masq2.put(key2, value2)
+    expect(await masq2.get(key2)).to.eql(value2)
+
+    // signout
+    await masq2.signout()
   })
 })

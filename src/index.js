@@ -39,19 +39,31 @@ class Masq {
       strict: true,
       on: {
         SIGNALLING_SERVER_ERROR: 'loginFailed',
-        SW_CLOSED_DURING_LOGIN: 'loginFailed'
+        SW_CLOSED_DURING_LOGIN: 'loginFailed',
+        ALREADY_LOGGED_IN: 'logInFromSessionInfo'
       },
       states: {
         notInitialized: {
           invoke: {
             id: 'init',
             src: _init,
-            onDone: {
-              target: 'notLogged',
-              actions: [ _sendReady ]
-            },
             onError: {
               target: 'initError'
+            }
+          },
+          on: {
+            INITIALIZED: {
+              target: 'notLogged',
+              actions: [ _sendReady ]
+            }
+          }
+        },
+        logInFromSessionInfo: {
+          invoke: {
+            src: _logInFromUserInfo,
+            onDone: {
+              target: 'logged',
+              actions: [ _sendReady ]
             }
           }
         },
@@ -118,6 +130,7 @@ class Masq {
           }
         },
         logged: {
+          entry: [ _storeSessionInfo ],
           on: {
             SIGNOUT: {
               target: 'notLogged',
@@ -202,8 +215,8 @@ class Masq {
     return this.service.machine.context.loginLink
   }
 
-  async isLoggedIn () {
-    this.service.machine.state.matches('logged')
+  isLoggedIn () {
+    return this.service.state.matches('logged')
   }
 
   async put (key, value) {
@@ -262,7 +275,7 @@ const _resetLogin = () => {
   console.log('--- RESET LOGIN ---')
 }
 
-const _init = async (context, event, actionMeta) => {
+const _init = (context, event, actionMeta) => async (cbParent) => {
   // override config with options argument
   context.config = {
     hubUrls: context.config.hubUrls || jsonConfig.hubUrls,
@@ -271,11 +284,18 @@ const _init = async (context, event, actionMeta) => {
     ...getNullAttributes()
   }
 
-  // try to login from session info
-  // await this._loadSessionInfo()
-
   assign(context)
   await _genLoginLink(context)
+
+  const userInfo = _checkSessionInfo()
+  if (userInfo) {
+    cbParent({
+      type: 'ALREADY_LOGGED_IN',
+      userInfo
+    })
+  } else {
+    cbParent('INITIALIZED')
+  }
 }
 
 const getNullAttributes = () => {
@@ -301,6 +321,57 @@ const getNullAttributes = () => {
   nullAttributes.profileImage = null
 
   return nullAttributes
+}
+
+const _checkSessionInfo = () => {
+  // If user info is stored in session storage, do not use localStorage
+  const currentUserInfo = window.sessionStorage.getItem(CURRENT_USER_INFO_STR)
+  if (currentUserInfo) {
+    return currentUserInfo
+  }
+
+  // if userId is is not in session storage, look for it in local storage
+  const localStorageCurrentUserInfo = window.localStorage.getItem(CURRENT_USER_INFO_STR)
+  if (localStorageCurrentUserInfo) {
+    return localStorageCurrentUserInfo
+  }
+}
+
+const _logInFromUserInfo = async (context, event) => {
+  const { userAppDbId, userAppDEK, userAppNonce, username, profileImage } = JSON.parse(event.userInfo)
+  context.userAppDbId = userAppDbId
+  context.userAppDEK = userAppDEK
+  context.importedUserAppDEK = await common.crypto.importKey(Buffer.from(userAppDEK, 'hex'))
+  context.userAppNonce = userAppNonce
+  context.username = username
+  context.profileImage = profileImage
+
+  window.sessionStorage.setItem(CURRENT_USER_INFO_STR, event.userInfo)
+
+  context.userAppDb = common.utils.createPromisifiedHyperDB(context.userAppDbId)
+  await common.utils.dbReady(context.userAppDb)
+}
+
+const _storeSessionInfo = (context) => {
+  console.log('[_storeSessionInfo]')
+  // Store the session info
+  const currentUserInfo = {
+    userAppDbId: context.userAppDbId,
+    userAppDEK: context.userAppDEK,
+    username: context.username,
+    profileImage: context.profileImage,
+    userAppNonce: context.userAppNonce
+  }
+
+  if (context.stayConnected) {
+    window.localStorage.setItem(CURRENT_USER_INFO_STR, JSON.stringify(currentUserInfo))
+  }
+  window.sessionStorage.setItem(CURRENT_USER_INFO_STR, JSON.stringify(currentUserInfo))
+}
+
+const _deleteSessionInfo = () => {
+  window.localStorage.removeItem(CURRENT_USER_INFO_STR)
+  window.sessionStorage.removeItem(CURRENT_USER_INFO_STR)
 }
 
 const _startLogin = (context, event, actionMeta) => (callbackParent, onEvent) => {
@@ -371,6 +442,7 @@ const _startLogin = (context, event, actionMeta) => (callbackParent, onEvent) =>
 }
 
 const _signout = (context, event) => {
+  _deleteSessionInfo()
 }
 
 // TODO check login link lifecycle
@@ -444,7 +516,6 @@ const _registerNeeded = (context) => async (cbParent) => {
 
     switch (json.msg) {
       case 'masqAccessGranted':
-        console.log('MSG => masqAccessGranted')
         cbParent({
           type: 'MASQ_ACCESS_GRANTED',
           loginJson: json
@@ -509,6 +580,7 @@ const _registering = (context, event) => async (cbParent) => {
 }
 
 const _readSessionInfoIntoState = async (context, event) => {
+  console.log('[_readSessionInfoIntoState]')
   const userInfoJson = event.loginJson
 
   const { userAppDbId, userAppDEK, userAppNonce, username, profileImage } = userInfoJson
