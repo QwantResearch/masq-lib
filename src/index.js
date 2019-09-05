@@ -19,7 +19,7 @@ const debug = (function () {
   }
 })()
 
-class MasqMachine {
+class Masq {
   get eventTarget () {
     return this.service.machine.context.eventTarget
   }
@@ -140,6 +140,16 @@ class MasqMachine {
     // setup listeners
     this._listenForLoginOrSignout()
     this._listenForFocus()
+  }
+
+  async init () {
+    await new Promise((resolve) => {
+      this.eventTarget.addEventListener(
+        'ready',
+        () => { resolve() },
+        { once: true }
+      )
+    })
   }
 
   async logIntoMasq (stayConnected) {
@@ -527,6 +537,6 @@ const _dbCreation = (context, event) => async (cbParent) => {
 }
 
 module.exports = {
-  MasqMachine,
+  Masq,
   MasqError
 }
