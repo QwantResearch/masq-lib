@@ -224,6 +224,32 @@ class MasqMachine {
       key
     )
   }
+
+  async del (key) {
+    const hashedKey = await common.utils.hashKey(
+      key,
+      this.service.machine.context.userAppNonce
+    )
+    return this.service.machine.context.userAppDb.delAsync(hashedKey)
+  }
+
+  async list (prefix) {
+    return common.utils.list(
+      this.service.machine.context.userAppDb,
+      this.service.machine.context.importedUserAppDEK,
+      this.service.machine.context.userAppNonce,
+      prefix
+    )
+  }
+
+  async watch (key, cb) {
+    return common.utils.watch(
+      this.service.machine.context.userAppDb,
+      this.service.machine.context.userAppNonce,
+      key,
+      cb
+    )
+  }
 }
 
 const _resetLogin = () => {
