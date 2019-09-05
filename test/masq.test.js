@@ -4,7 +4,7 @@ const swarm = require('webrtc-swarm')
 const common = require('masq-common')
 const MasqError = common.errors.MasqError
 
-const MasqMachine = require('../src').MasqMachine
+const Masq = require('../src').Masq
 const MasqAppMock = require('./mockMasqApp')
 const testConfig = require('../config/config.test.json')
 
@@ -65,12 +65,8 @@ describe('Test data access and input', function () {
 
   beforeEach(async () => {
     console.log('######## BEFORE EACH ########')
-    masq = new MasqMachine(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL, testConfig)
-    await new Promise((resolve) => {
-      masq.eventTarget.addEventListener('ready', () => {
-        resolve()
-      })
-    })
+    masq = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL, testConfig)
+    await masq.init()
     mockMasqApp = new MasqAppMock()
     await mockMasqApp.init()
     console.log('######## END BEFORE EACH ########')
