@@ -38,12 +38,8 @@ class MasqMachine {
       },
       strict: true,
       on: {
-        SIGNALLING_SERVER_ERROR: {
-          target: 'loginFailed'
-        },
-        SW_CLOSED_DURING_LOGIN: {
-          target: 'loginFailed'
-        }
+        SIGNALLING_SERVER_ERROR: 'loginFailed',
+        SW_CLOSED_DURING_LOGIN: 'loginFailed'
       },
       states: {
         notInitialized: {
@@ -63,9 +59,7 @@ class MasqMachine {
         },
         notLogged: {
           on: {
-            LOGIN_START: {
-              target: 'loggingIn'
-            }
+            LOGIN_START: 'loggingIn'
           }
         },
         loggingIn: {
@@ -75,9 +69,7 @@ class MasqMachine {
           },
           on: {
             DISCONNECTED: 'loginFailed',
-            AUTHORIZED: {
-              target: 'authorized'
-            },
+            AUTHORIZED: 'authorized',
             NOT_AUTHORIZED: 'registerNeeded'
           }
         },
@@ -86,9 +78,7 @@ class MasqMachine {
             src: _registerNeeded
           },
           on: {
-            MASQ_ACCESS_GRANTED: {
-              target: 'accessMaterialReceived'
-            },
+            MASQ_ACCESS_GRANTED: 'accessMaterialReceived',
             MASQ_ACCESS_REFUSED: 'loginFailed'
           }
         },
