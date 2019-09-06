@@ -38,6 +38,7 @@ class Masq {
       },
       strict: true,
       on: {
+        DISCONNECTED: 'loginFailed',
         SIGNALLING_SERVER_ERROR: 'loginFailed',
         SW_CLOSED_DURING_LOGIN: 'loginFailed'
       },
@@ -85,7 +86,6 @@ class Masq {
             src: _startLogin
           },
           on: {
-            DISCONNECTED: 'loginFailed',
             AUTHORIZED: 'authorized',
             NOT_AUTHORIZED: 'registerNeeded'
           }
