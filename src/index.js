@@ -434,7 +434,7 @@ const _startLogin = (context, event, actionMeta) => (callbackParent, onEvent) =>
           // if this User-app is not registered
           callbackParent({
             type: 'NOT_AUTHORIZED',
-            peer: loginPeer
+            loginPeer
           })
           break
 
@@ -443,7 +443,7 @@ const _startLogin = (context, event, actionMeta) => (callbackParent, onEvent) =>
           callbackParent({
             type: 'WRONG_MESSAGE',
             errorMessage: `Unexpectedly received message with type ${json.msg}`,
-            peer: loginPeer
+            loginPeer
           })
       }
     })
@@ -513,12 +513,18 @@ const _receivedAuthorized = (context, event) => async (cbParent) => {
       loginJson: event.loginJson
     })
   } else {
-    cbParent('REGISTER_NEEDED')
+    cbParent({
+      type: 'REGISTER_NEEDED',
+      loginPeer: event.loginPeer
+    })
   }
 }
 
-const _registerNeeded = (context) => async (cbParent) => {
+const _registerNeeded = (context, event) => async (cbParent) => {
   debug('[masq._registerNeeded]')
+
+  context.loginPeer = event.loginPeer
+  assign(context)
 
   const msg = {
     msg: 'registerUserApp',
