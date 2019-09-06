@@ -138,7 +138,17 @@ describe('Test data access and input', function () {
     window.sessionStorage.removeItem(CURRENT_USER_INFO_STR)
   }
 
-  it('should be able to connect with new Masq instance after logging in with stayConnected and closing (deleteSessionStorage)', async () => {
+  it('second login: login with an already registered UserApp', async () => {
+    expect(masq.isLoggedIn()).to.be.false
+    await logInWithMasqAppMock(true)
+    expect(masq.isLoggedIn()).to.be.true
+    await masq.signout()
+    expect(masq.isLoggedIn()).to.be.false
+    await logInWithMasqAppMock(true)
+    expect(masq.isLoggedIn()).to.be.true
+  })
+
+  it('stayConnected: should be able to connect with new Masq instance after logging in with stayConnected and closing (deleteSessionStorage)', async () => {
     expect(masq.isLoggedIn()).to.be.false
     await logInWithMasqAppMock(true)
 
@@ -161,5 +171,21 @@ describe('Test data access and input', function () {
 
     // signout
     await masq2.signout()
+  })
+
+  it('second login with stayConnected', async () => {
+    expect(masq.isLoggedIn()).to.be.false
+    await logInWithMasqAppMock(true)
+    expect(masq.isLoggedIn()).to.be.true
+    await masq.signout()
+    expect(masq.isLoggedIn()).to.be.false
+    await logInWithMasqAppMock(true)
+    expect(masq.isLoggedIn()).to.be.true
+
+    // reconnect with new Masq instance
+    await _deleteSessionStorage()
+    const masq2 = new Masq(APP_NAME, APP_DESCRIPTION, APP_IMAGE_URL, testConfig)
+    await masq2.init()
+    expect(masq2.isLoggedIn()).to.be.true
   })
 })
