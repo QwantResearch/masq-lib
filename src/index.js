@@ -125,7 +125,9 @@ class Masq {
           }
         },
         loginFailed: {
-          actions: [ _resetLogin ],
+          invoke: {
+            src: _resetLogin
+          },
           target: 'notLogged'
         },
         connectionEstablished: {
@@ -181,8 +183,7 @@ class Masq {
         if (state.value === 'logged') {
           resolve()
         } else if (state.value === 'loginFailed') {
-          console.log('logIntoMasq: loginFailed')
-          reject(new MasqError(MasqError.DISCONNECTED_DURING_LOGIN))
+          reject(state.context.loginError)
         }
       })
     })
@@ -276,8 +277,21 @@ class Masq {
   }
 }
 
-const _resetLogin = () => {
+const _resetLogin = (context, event) => {
   console.log('--- RESET LOGIN ---')
+  let err
+  switch (event.type) {
+    case 'MASQ_ACCESS_REFUSED':
+      err = new MasqError(MasqError.MASQ_ACCESS_REFUSED_BY_USER)
+      break
+    case 'DISCONNECTED':
+      err = new MasqError(MasqError.DISCONNECTED_DURING_LOGIN)
+      break
+    default:
+      err = new MasqError()
+  }
+  context.loginError = err
+  assign(context)
 }
 
 const _init = (context, event, actionMeta) => async (cbParent) => {
