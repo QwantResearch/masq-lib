@@ -39,31 +39,36 @@ class Masq {
       strict: true,
       on: {
         SIGNALLING_SERVER_ERROR: 'loginFailed',
-        SW_CLOSED_DURING_LOGIN: 'loginFailed',
-        ALREADY_LOGGED_IN: 'logInFromSessionInfo'
+        SW_CLOSED_DURING_LOGIN: 'loginFailed'
       },
       states: {
         notInitialized: {
-          invoke: {
-            id: 'init',
-            src: _init,
-            onError: {
-              target: 'initError'
-            }
-          },
-          on: {
-            INITIALIZED: {
-              target: 'notLogged',
-              actions: [ _sendReady ]
-            }
-          }
-        },
-        logInFromSessionInfo: {
-          invoke: {
-            src: _logInFromUserInfo,
-            onDone: {
-              target: 'logged',
-              actions: [ _sendReady ]
+          initial: 'notInit',
+          states: {
+            notInit: {
+              invoke: {
+                id: 'init',
+                src: _init,
+                onError: {
+                  target: '#Masq.initError'
+                }
+              },
+              on: {
+                INITIALIZED: {
+                  target: '#Masq.notLogged',
+                  actions: [ _sendReady ]
+                },
+                ALREADY_LOGGED_IN: 'logInFromSessionInfo'
+              }
+            },
+            logInFromSessionInfo: {
+              invoke: {
+                src: _logInFromUserInfo,
+                onDone: {
+                  target: '#Masq.logged',
+                  actions: [ _sendReady ]
+                }
+              }
             }
           }
         },
