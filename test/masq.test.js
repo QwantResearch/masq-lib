@@ -148,11 +148,11 @@ describe('Test data access and input', function () {
 
   it('second login: login with an already registered UserApp', async () => {
     expect(masq.isLoggedIn()).to.be.false
-    await logInWithMasqAppMock(true)
+    await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).to.be.true
     await masq.signout()
     expect(masq.isLoggedIn()).to.be.false
-    await logInWithMasqAppMock(true)
+    await logInWithMasqAppMock(false)
     expect(masq.isLoggedIn()).to.be.true
   })
 
