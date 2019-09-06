@@ -196,4 +196,25 @@ describe('Test data access and input', function () {
     await masq2.init()
     expect(masq2.isLoggedIn()).to.be.true
   })
+
+  it('connection refused by user', async () => {
+    expect(masq.isLoggedIn()).to.be.false
+    // stop replication if logInWithMasqAppMock has already been called
+    mockMasqApp.destroy()
+
+    const link = await masq.getLoginLink()
+    const hashParams = getHashParams(link)
+
+    let err
+    try {
+      await Promise.all([
+        mockMasqApp.handleConnectionRegisterRefused(hashParams.channel, hashParams.key),
+        masq.logIntoMasq(false)
+      ])
+    } catch (e) {
+      err = e
+    }
+    expect(masq.isLoggedIn()).to.be.false
+    expect(err.code).to.equal(MasqError.MASQ_ACCESS_REFUSED_BY_USER)
+  })
 })
