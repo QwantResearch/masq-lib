@@ -10,6 +10,7 @@ const ram = require('random-access-memory')
 const config = require('../config/config.test.json')
 
 const MasqError = common.errors.MasqError
+const MasqMessages = common.messages.UserAppLogin
 
 const createPromisifiedHyperDBMock = (name, hexKey) => {
   const methodsToPromisify = ['version', 'put', 'get', 'del', 'batch', 'list', 'authorize', 'authorized']
@@ -124,7 +125,7 @@ class MockMasqApp {
           // Send authorize or not
           if (authorized) {
             const msg = {
-              msg: 'authorized',
+              msg: MasqMessages.AUTHORIZED,
               userAppDbId: userAppId,
               userAppDEK: this.userAppDEK,
               userAppNonce: this.nonce,
@@ -135,7 +136,7 @@ class MockMasqApp {
             peer.send(JSON.stringify(encryptedMsg))
           } else {
             const msg = {
-              msg: 'notAuthorized'
+              msg: MasqMessages.NOT_AUTHORIZED
             }
             const encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
             peer.send(JSON.stringify(encryptedMsg))
@@ -144,10 +145,10 @@ class MockMasqApp {
           peer.on('data', async data => {
             const json = await common.crypto.decrypt(key, JSON.parse(data), 'base64')
             switch (json.msg) {
-              case 'connectionEstablished':
+              case MasqMessages.CONNECTION_ESTABLISHED:
                 sw.close()
                 break
-              case 'registerUserApp':
+              case MasqMessages.REGISTER_USER_APP:
                 if (registered) {
                   reject(new MasqError(MasqError.WRONG_MESSAGE, 'Already registered but received message with type "registered"'))
                 }
@@ -156,7 +157,7 @@ class MockMasqApp {
                   await common.utils.dbReady(this.dbs[userAppId])
                   this._startReplication(userAppId)
                   const msg = {
-                    msg: 'masqAccessGranted',
+                    msg: MasqMessages.MASQ_ACCESS_GRANTED,
                     userAppDbId: userAppId,
                     userAppDEK: this.userAppDEK,
                     userAppNonce: this.nonce,
@@ -169,21 +170,21 @@ class MockMasqApp {
                   registered = true
                 } else {
                   const msg = {
-                    msg: 'masqAccessRefused'
+                    msg: MasqMessages.MASQ_ACCESS_REFUSED
                   }
                   const encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
                   peer.send(JSON.stringify(encryptedMsg))
                   sw.close()
                 }
                 break
-              case 'requestWriteAccess':
+              case MasqMessages.REQUEST_WRITE_ACCESS:
                 if (!registered) {
                   reject(new MasqError(MasqError.WRONG_MESSAGE, 'Expected to receive message with type "register", but received "requestWriteAccess"'))
                 }
 
                 this.dbs[userAppId].authorizeAsync(Buffer.from(json.key, 'hex')).then(async () => {
                   const msg = {
-                    msg: 'writeAccessGranted'
+                    msg: MasqMessages.WRITE_ACCESS_GRANTED
                   }
                   const encryptedMsg = await common.crypto.encrypt(key, msg, 'base64')
                   peer.send(JSON.stringify(encryptedMsg))

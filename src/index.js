@@ -6,6 +6,7 @@ const uuidv4 = require('uuid/v4')
 
 const common = require('masq-common')
 const MasqError = common.errors.MasqError
+const MasqMessages = common.messages.UserAppLogin
 const CURRENT_USER_INFO_STR = 'currentUserInfo'
 
 const jsonConfig = require('../config/config.prod.json')
@@ -422,7 +423,7 @@ const _startLogin = (context, event, actionMeta) => (callbackParent, onEvent) =>
       console.log('MESSAGE: ', json)
 
       switch (json.msg) {
-        case 'authorized':
+        case MasqMessages.AUTHORIZED:
           callbackParent({
             type: 'AUTHORIZED',
             loginPeer,
@@ -430,7 +431,7 @@ const _startLogin = (context, event, actionMeta) => (callbackParent, onEvent) =>
           })
           break
 
-        case 'notAuthorized':
+        case MasqMessages.NOT_AUTHORIZED:
           // if this User-app is not registered
           callbackParent({
             type: 'NOT_AUTHORIZED',
@@ -527,7 +528,7 @@ const _registerNeeded = (context, event) => async (cbParent) => {
   assign(context)
 
   const msg = {
-    msg: 'registerUserApp',
+    msg: MasqMessages.REGISTER_USER_APP,
     name: context.appName,
     description: context.appDescription,
     imageURL: context.appImageURL
@@ -540,14 +541,14 @@ const _registerNeeded = (context, event) => async (cbParent) => {
     const json = await common.crypto.decrypt(context.loginKey, JSON.parse(data), 'base64')
 
     switch (json.msg) {
-      case 'masqAccessGranted':
+      case MasqMessages.MASQ_ACCESS_GRANTED:
         cbParent({
           type: 'MASQ_ACCESS_GRANTED',
           loginJson: json
         })
         break
 
-      case 'masqAccessRefused':
+      case MasqMessages.MASQ_ACCESS_REFUSED:
         cbParent('MASQ_ACCESS_REFUSED')
         break
 
@@ -570,7 +571,7 @@ const _registering = (context, event) => async (cbParent) => {
   await common.utils.dbReady(context.userAppDb)
 
   const msg = {
-    msg: 'requestWriteAccess',
+    msg: MasqMessages.REQUEST_WRITE_ACCESS,
     key: context.userAppDb.local.key.toString('hex')
   }
   const encryptedMsg = await common.crypto.encrypt(context.loginKey, msg, 'base64')
@@ -582,7 +583,7 @@ const _registering = (context, event) => async (cbParent) => {
       const json = await common.crypto.decrypt(context.loginKey, JSON.parse(data), 'base64')
 
       switch (json.msg) {
-        case 'writeAccessGranted':
+        case MasqMessages.WRITE_ACCESS_GRANTED:
           cbParent({
             type: 'WRITE_ACCESS_GRANTED',
             loginJson: event.loginJson
@@ -628,7 +629,7 @@ const _dbCreation = (context, event) => async (cbParent) => {
   debug('[masq._dbCreation]')
 
   const msg = {
-    msg: 'connectionEstablished'
+    msg: MasqMessages.CONNECTION_ESTABLISHED
   }
   const encryptedMsg = await common.crypto.encrypt(context.loginKey, msg, 'base64')
 
