@@ -22,7 +22,7 @@
   },
   "homepage": "https://github.com/QwantResearch/masq-lib#readme",
   "dependencies": {
-    "masq-common": "git+https://github.com/QwantResearch/masq-common#v0.10.1",
+    "masq-common": "git+https://github.com/QwantResearch/masq-common#v0.10.2",
     "signalhubws": "git+https://github.com/QwantResearch/signalhubws#masq",
     "uuid": "^3.3.2",
     "webrtc-swarm": "git+https://github.com/QwantResearch/webrtc-swarm#masq",
