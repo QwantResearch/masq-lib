@@ -24,7 +24,7 @@ class Masq {
     return this.service.machine.context.eventTarget
   }
 
-  constructor (appName, appDescription, appImageURL, config) {
+  constructor (appName, appDescription, appImageURL, config = {}) {
     const eventTarget = document.createElement('MasqLib')
     this.machine = Machine({
       id: 'Masq',
@@ -258,14 +258,12 @@ const _resetLogin = () => {
 
 const _init = async (context, event, actionMeta) => {
   // override config with options argument
-  context.config = context.config ? context.config : {}
   context.config = {
-    hubUrls: context.config.hubUrls ? context.config.hubUrls : jsonConfig.hubUrls,
-    masqAppBaseUrl: context.config.masqAppBaseUrl ? context.config.masqAppBaseUrl : jsonConfig.masqAppBaseUrl,
-    swarmConfig: context.config.swarmConfig ? context.config.swarmConfig : jsonConfig.swarmConfig
+    hubUrls: context.config.hubUrls || jsonConfig.hubUrls,
+    masqAppBaseUrl: context.config.masqAppBaseUrl || jsonConfig.masqAppBaseUrl,
+    swarmConfig: context.config.swarmConfig || jsonConfig.swarmConfig,
+    ...getNullAttributes()
   }
-
-  context = initNullAttributes(context)
 
   // try to login from session info
   // await this._loadSessionInfo()
@@ -274,27 +272,29 @@ const _init = async (context, event, actionMeta) => {
   await _genLoginLink(context)
 }
 
-const initNullAttributes = (context) => {
+const getNullAttributes = () => {
+  const nullAttributes = {}
+
   // login state data
-  context.stayConnected = false
-  context.loginSw = null
-  context.loginPeer = null
+  nullAttributes.stayConnected = false
+  nullAttributes.loginSw = null
+  nullAttributes.loginPeer = null
 
   // reset replication variables
-  context.replicating = false
-  context.userAppRepSW = null
-  context.userAppRepHub = null
+  nullAttributes.replicating = false
+  nullAttributes.userAppRepSW = null
+  nullAttributes.userAppRepHub = null
 
   // reset logged in user variable
-  context.userAppDbId = null
-  context.userAppDb = null
-  context.userAppDEK = null
-  context.importedUserAppDEK = null
-  context.userAppNonce = null
-  context.username = null
-  context.profileImage = null
+  nullAttributes.userAppDbId = null
+  nullAttributes.userAppDb = null
+  nullAttributes.userAppDEK = null
+  nullAttributes.importedUserAppDEK = null
+  nullAttributes.userAppNonce = null
+  nullAttributes.username = null
+  nullAttributes.profileImage = null
 
-  return context
+  return nullAttributes
 }
 
 const _startLogin = (context, event, actionMeta) => (callbackParent, onEvent) => {
