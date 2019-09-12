@@ -207,45 +207,51 @@ class Masq {
   }
 
   async put (key, value) {
+    const { userAppDb, importedUserAppDEK, userAppNonce } = this.service.machine.context
     return common.utils.put(
-      this.service.machine.context.userAppDb,
-      this.service.machine.context.importedUserAppDEK,
-      this.service.machine.context.userAppNonce,
+      userAppDb,
+      importedUserAppDEK,
+      userAppNonce,
       key,
       value
     )
   }
 
   async get (key) {
+    const { userAppDb, importedUserAppDEK, userAppNonce } = this.service.machine.context
     return common.utils.get(
-      this.service.machine.context.userAppDb,
-      this.service.machine.context.importedUserAppDEK,
-      this.service.machine.context.userAppNonce,
+      userAppDb,
+      importedUserAppDEK,
+      userAppNonce,
       key
     )
   }
 
   async del (key) {
-    const hashedKey = await common.utils.hashKey(
-      key,
-      this.service.machine.context.userAppNonce
+    const { userAppDb, importedUserAppDEK, userAppNonce } = this.service.machine.context
+    return common.utils.del(
+      userAppDb,
+      importedUserAppDEK,
+      userAppNonce,
+      key
     )
-    return this.service.machine.context.userAppDb.delAsync(hashedKey)
   }
 
   async list (prefix) {
+    const { userAppDb, importedUserAppDEK, userAppNonce } = this.service.machine.context
     return common.utils.list(
-      this.service.machine.context.userAppDb,
-      this.service.machine.context.importedUserAppDEK,
-      this.service.machine.context.userAppNonce,
+      userAppDb,
+      importedUserAppDEK,
+      userAppNonce,
       prefix
     )
   }
 
   async watch (key, cb) {
+    const { userAppDb, userAppNonce } = this.service.machine.context
     return common.utils.watch(
-      this.service.machine.context.userAppDb,
-      this.service.machine.context.userAppNonce,
+      userAppDb,
+      userAppNonce,
       key,
       cb
     )
