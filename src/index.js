@@ -343,6 +343,12 @@ class Masq {
 
       this.loginSw.on('peer', (peer, id) => {
         debug(`The peer ${id} join us...`)
+
+        common.peerUtils.getSelectedCandidates(peer).then(sc => {
+          console.log(`connect local ${sc.localAddress}:${sc.localPort} ; remote ${sc.remoteAddress}:${sc.remotePort}`)
+          console.log(`connect local type ${sc.localType} ; remote type ${sc.remoteType}`)
+        })
+
         this.loginPeer = peer
 
         this.loginPeer.once('data', async (data) => {
